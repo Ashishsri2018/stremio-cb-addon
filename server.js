@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('./config');
 const { getRegistry } = require('./providers');
-const { collectStreams, getRuntimeStats } = require('./streams');
+const { collectStreams, collectSubtitles, getRuntimeStats } = require('./streams');
 const { DEFAULT_CONFIG, decodeConfig } = require('./filters');
 
 const logoPath = path.join(__dirname, 'logo.png');
@@ -11,8 +11,11 @@ const configurePath = path.join(__dirname, 'configure.html');
 const startedAt = Date.now();
 const shutdownTimeoutMs = 25000;
 const streamRoute = /^\/stream\/(movie|series)\/([^/]+)\.json$/;
+const subtitleRoute = /^\/subtitles\/(movie|series)\/([^/]+?)(?:\/[^/]+)?\.json$/;
 const configManifestRoute = /^\/([A-Za-z0-9_-]{1,512})\/manifest\.json$/;
 const configStreamRoute = /^\/([A-Za-z0-9_-]{1,512})\/stream\/(movie|series)\/([^/]+)\.json$/;
+const configSubtitleRoute =
+  /^\/([A-Za-z0-9_-]{1,512})\/subtitles\/(movie|series)\/([^/]+?)(?:\/[^/]+)?\.json$/;
 const imdbPattern = /^(tt\d+)(?::(\d+):(\d+))?$/;
 
 let configureHtml = null;
@@ -47,10 +50,10 @@ function manifestFor(req) {
     version: '1.0.0',
     name: config.addonName,
     description:
-      'Multi-provider stream addon powered by the CB Providers fleet (MoviesDrive, 4KHDHub, HDHub4u, VegaMovies, NetMirror, anime providers and more). Resolves content from IMDb IDs. Configure resolution, size, and subtitle filters at /configure.',
+      'Multi-provider stream addon powered by the CB Providers fleet (MoviesDrive, 4KHDHub, HDHub4u, VegaMovies, NetMirror, anime providers and more). Resolves content from IMDb IDs and serves provider subtitle tracks. Configure resolution, size, and subtitle filters at /configure.',
     logo: `${baseUrl(req)}/logo.png`,
     types: ['movie', 'series'],
-    resources: ['stream'],
+    resources: ['stream', 'subtitles'],
     idPrefixes: ['tt'],
     catalogs: [],
     behaviorHints: { configurable: true },
@@ -67,6 +70,11 @@ function resolveRoute(pathname) {
     return { kind: 'stream', type: match[1], rawId: match[2], config: DEFAULT_CONFIG };
   }
 
+  match = subtitleRoute.exec(pathname);
+  if (match) {
+    return { kind: 'subtitles', type: match[1], rawId: match[2], config: DEFAULT_CONFIG };
+  }
+
   match = configManifestRoute.exec(pathname);
   if (match) {
     const config = decodeConfig(match[1]);
@@ -78,6 +86,14 @@ function resolveRoute(pathname) {
     const config = decodeConfig(match[1]);
     return config
       ? { kind: 'stream', type: match[2], rawId: match[3], config }
+      : { kind: 'invalid-config' };
+  }
+
+  match = configSubtitleRoute.exec(pathname);
+  if (match) {
+    const config = decodeConfig(match[1]);
+    return config
+      ? { kind: 'subtitles', type: match[2], rawId: match[3], config }
       : { kind: 'invalid-config' };
   }
 
@@ -199,13 +215,22 @@ const server = http.createServer(async (req, res) => {
   const episode = idMatch[3] ? Number(idMatch[3]) : null;
 
   if (type === 'series' && (season === null || episode === null)) {
-    sendJson(res, 200, { streams: [] });
+    sendJson(res, 200, route.kind === 'subtitles' ? { subtitles: [] } : { streams: [] });
     return;
   }
 
   try {
-    const streams = await collectStreams(imdbId, type, season, episode, userConfig);
     const label = season === null ? imdbId : `${imdbId} S${season}E${episode}`;
+    if (route.kind === 'subtitles') {
+      const subtitles = await collectSubtitles(imdbId, type, season, episode);
+      console.log(
+        `[server] subtitles ${type} ${label} -> ${subtitles.length} tracks (${Date.now() - started}ms)`
+      );
+      sendJson(res, 200, { subtitles }, 'public, max-age=180');
+      return;
+    }
+
+    const streams = await collectStreams(imdbId, type, season, episode, userConfig);
     console.log(
       `[server] ${type} ${label} -> ${streams.length} streams (${Date.now() - started}ms)`
     );

@@ -418,6 +418,50 @@ async function main() {
     assert.strictEqual(stats.providers[0].ok, 1);
   });
 
+  await checkAsync('collector aggregates and dedupes subtitles across provider streams', async () => {
+    const clock = fakeClock();
+    const breaker = createBreaker({ now: clock.now });
+    const cache = createStreamCache({ ttlMs: 60000, maxEntries: 10, now: clock.now });
+    let calls = 0;
+    const first = provider('first', 0, async () => {
+      calls += 1;
+      return [
+        {
+          url: 'https://x/one',
+          subtitles: [
+            { url: 'https://sub/english.srt', language: 'English' },
+            { file: 'https://sub/hindi.srt', label: 'Hindi' },
+          ],
+        },
+        {
+          url: 'https://x/two',
+          subtitles: [{ url: 'https://sub/english.srt', language: 'eng' }],
+        },
+      ];
+    });
+    const second = provider('second', 1, async () => [
+      {
+        url: 'https://x/three',
+        subtitles: [{ url: 'https://sub/japanese.srt', lang: 'ja' }],
+      },
+    ]);
+    const collector = makeCollector({ providers: [first, second], breaker, cache });
+
+    const subtitles = await collector.collectSubtitles('tt7', 'movie', null, null);
+    assert.deepStrictEqual(
+      subtitles.map((track) => track.url),
+      ['https://sub/english.srt', 'https://sub/hindi.srt', 'https://sub/japanese.srt']
+    );
+    assert.strictEqual(subtitles[0].lang, 'en');
+    assert.strictEqual(subtitles[1].lang, 'hi');
+    assert.strictEqual(subtitles[2].lang, 'ja');
+
+    const streams = await collector.collectStreams('tt7', 'movie', null, null, DEFAULT_CONFIG);
+    assert.strictEqual(streams.length, 3);
+    assert.strictEqual(calls, 1);
+    assert.strictEqual(cache.stats().hits, 1);
+  });
+
   await checkAsync('collector skips open circuits without invoking providers', async () => {
     const clock = fakeClock();
     const breaker = createBreaker({ threshold: 1, cooldownMs: 60000, now: clock.now });

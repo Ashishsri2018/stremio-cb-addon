@@ -2,7 +2,7 @@ const config = require('./config');
 const { getRegistry, providersFor } = require('./providers');
 const cinemeta = require('./cinemeta');
 const { qualityRank, toStremioStream } = require('./format');
-const { DEFAULT_CONFIG, streamPassesFilters } = require('./filters');
+const { DEFAULT_CONFIG, normalizeSubtitles, streamPassesFilters } = require('./filters');
 const { createBreaker } = require('./lib/breaker');
 const { createStreamCache } = require('./lib/stream-cache');
 const { TimeoutError, withTimeout } = require('./lib/timeout');
@@ -133,6 +133,24 @@ function createCollector({
       .filter(Boolean);
   }
 
+  async function collectSubtitles(imdbId, type, season, episode) {
+    const key = streamKey(type, imdbId, season, episode);
+    const raw = await cache.getOrLoad(key, () =>
+      runProviders(imdbId, type, season, episode)
+    );
+
+    const seen = new Set();
+    const subtitles = [];
+    for (const item of raw) {
+      for (const track of normalizeSubtitles(item.stream.subtitles)) {
+        if (seen.has(track.url)) continue;
+        seen.add(track.url);
+        subtitles.push(track);
+      }
+    }
+    return subtitles;
+  }
+
   function getRuntimeStats() {
     const registry = getProviders();
     const seen = new Map(breaker.snapshot().map((entry) => [entry.id, entry]));
@@ -169,7 +187,7 @@ function createCollector({
     };
   }
 
-  return { collectStreams, getRuntimeStats };
+  return { collectStreams, collectSubtitles, getRuntimeStats };
 }
 
 const defaultCollector = createCollector();
@@ -177,5 +195,6 @@ const defaultCollector = createCollector();
 module.exports = {
   createCollector,
   collectStreams: defaultCollector.collectStreams,
+  collectSubtitles: defaultCollector.collectSubtitles,
   getRuntimeStats: defaultCollector.getRuntimeStats,
 };

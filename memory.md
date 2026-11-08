@@ -17,11 +17,26 @@ Conventions:
 - CI/CD: GitHub Actions CI on push; upstream sync daily 03:17 UTC; Render auto-deploy after CI checks pass
 - Verified live before the torrent disable: `/health` showed 28 providers; `tt0137523` returned 66 streams from 12 providers (70 streams / 16 providers locally)
 - Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
+- Manifest advertises both `stream` and `subtitles` resources; `/subtitles/{type}/{id}` aggregates provider tracks from the shared raw cache
 - TMDB fallback: user-supplied key stored as a Render secret (not in git); providers still use their embedded keys
 - Runtime resilience: per-provider circuit breaker + `/stats`; Cinemeta/TMDB raced in parallel; raw stream results cached 3 min
 - Keep-alive: `.github/workflows/keep-alive.yml` pings `/health` every 10 min via four daily 5h50m jobs (~1,400 Actions min/month)
 
 ## Log
+
+### 2026-11-08 - Stremio subtitles resource for Nuvio Mobile
+
+- Manifest now advertises `resources: ["stream", "subtitles"]` (string entries inherit `types` and `idPrefixes`). Added `/subtitles/{movie|series}/{id}.json` and `/{config}/subtitles/...`; the optional Stremio extras segment is accepted and ignored.
+- `collectSubtitles` in `streams.js` flattens `normalizeSubtitles()` from the same raw provider cache and dedupes by URL. User filters are not applied; the response is `{subtitles:[{id,url,lang}]}` with `cache-control: public, max-age=180`.
+- Why: Nuvio Mobile's `StreamParser` ignores inline `streams[].subtitles`; it only queries addons that declare a `subtitles` resource. Stremio and Nuvio TV already consume the inline tracks.
+- Verification: `npm test`, `npm run lint`, `npm run verify` (27/27); manual `PROVIDERS=moviebox` returned subtitle tracks for movie and series ids; extras-path, configured, invalid-id, and missing-season routes behave correctly.
+
+### 2026-11-08 - Nuvio Mobile subtitle interop investigation
+
+- Nuvio Mobile ignores stream-embedded subtitles from Stremio addons. `StreamParser.parse` (`composeApp/src/commonMain/kotlin/com/nuvio/app/features/streams/StreamParser.kt`) never reads `streams[].subtitles`; `StreamItem.externalSubtitles` is populated only for Nuvio plugin scraper results (`StreamFetchSupport.kt`). NuvioTV (`StreamDto.subtitles`) and Stremio do parse inline subtitles, so the gap is specific to Nuvio Mobile.
+- Nuvio Mobile only queries addons whose manifest declares a `subtitles`/`subtitle` resource (`AddonSubtitleLoader.addonSubtitleRequests`) via `/subtitles/:type/:videoId[/extras].json`. This addon advertises only `stream` and has no `/subtitles` route, so Nuvio never asks it for subtitles.
+- Confirmed the addon does return inline subs: `PROVIDERS=moviebox` for `tt0137523` returned 1 stream with 2 English tracks.
+- Reference clone: `/root/iptv/NuvioMobile` at `de60c5a` (0.6.10-beta), kept for future interop checks.
 
 ### 2026-11-08 - Torrent providers disabled
 

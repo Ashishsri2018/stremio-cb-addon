@@ -5,8 +5,9 @@ Stremio stream addon that wraps the CB Providers (Nuvio) scraper fleet and answe
 ## System overview
 
 ```
-Stremio client
+Stremio/Nuvio client
   |  GET /stream/{movie|series}/{imdb-id}.json
+  |  GET /subtitles/{movie|series}/{imdb-id}.json
   v
 server.js (Node >=18, Render)
   |-- cinemeta.js   IMDb ID -> TMDB ID (Cinemeta and TMDB raced, bounded LRU, 24h/60s TTL)
@@ -18,9 +19,10 @@ server.js (Node >=18, Render)
   |     |-- dedupe by URL, then filters.js: user resolution/size/subtitle filters
   |     |-- format.js: normalize to Stremio streams (subtitles, videoSize, proxyHeaders, notWebReady, bingeGroup)
   |     `-- sort by quality rank, then provider health, then manifest order
+  |-- /subtitles: aggregates provider tracks from the same raw cache, deduped by URL
   |-- /stats and /health: circuit, cache, and uptime telemetry
   v
-{ "streams": [ ... ] }
+{ "streams": [ ... ] } | { "subtitles": [ ... ] }
 ```
 
 ## Stremio protocol
@@ -28,7 +30,7 @@ server.js (Node >=18, Render)
 Manifest (`/manifest.json`):
 
 - `id`: `community.cb-providers`
-- `resources`: `["stream"]`
+- `resources`: `["stream", "subtitles"]`
 - `types`: `["movie", "series"]`
 - `idPrefixes`: `["tt"]`
 - `catalogs`: `[]`
@@ -45,10 +47,20 @@ Stream routes:
 - `GET /stats` returns detailed in-memory telemetry: per-provider circuit state and counters, stream cache stats, and metadata cache stats.
 - `GET /logo.png` serves the addon logo used by `/manifest.json`.
 
+Subtitle routes:
+
+- Movie: `/subtitles/movie/tt0137523.json`
+- Series episode: `/subtitles/series/tt0944947:1:1.json`
+- The optional Stremio extras segment (`/videoHash=...&videoSize=...&filename=....json`) is accepted and ignored.
+- Response is `{ "subtitles": [{ "id", "url", "lang" }] }`, aggregated from every provider stream for that title and deduped by URL. It shares the 3-minute raw stream cache and does not apply user filters.
+- Series without season/episode returns `200 {"subtitles":[]}`.
+- Nuvio Mobile ignores `subtitles` embedded in stream objects and only queries addons that advertise a `subtitles` resource, so this endpoint is required for those clients. Stremio and Nuvio TV consume both paths.
+
 Configured routes (settings encoded as base64url JSON in the path, no server-side state):
 
 - Manifest: `/{config}/manifest.json`
 - Stream: `/{config}/stream/{movie|series}/{id}.json`
+- Subtitles: `/{config}/subtitles/{movie|series}/{id}.json`
 - `GET /configure` serves the HTML builder that generates these URLs and a `stremio://` install link. The file is read once at startup and served from memory.
 - A path segment that does not decode to a JSON object returns `400 {"error":"Invalid configuration"}`; plain routes use permissive defaults.
 
@@ -65,7 +77,7 @@ Stream object mapping (format.js):
 
 Results are ordered by quality rank, then provider health (Laplace-smoothed `ok/calls`), then manifest order.
 
-Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) keyed by `type:imdbId:season:episode`, before user filters and formatting, so one entry serves every filter configuration. The cache is bounded (`STREAM_CACHE_MAX_ENTRIES`), stores only non-empty results, and coalesces concurrent identical requests. URLs are time-signed, so the TTL stays short and can be disabled with `0`.
+Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) keyed by `type:imdbId:season:episode`, before user filters and formatting, so one entry serves every filter configuration and the subtitle endpoint. The cache is bounded (`STREAM_CACHE_MAX_ENTRIES`), stores only non-empty results, and coalesces concurrent identical requests. URLs are time-signed, so the TTL stays short and can be disabled with `0`.
 
 ## Components
 
@@ -75,7 +87,7 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 | `config.js` | Environment configuration with defaults |
 | `providers.js` | Reads vendored manifest, skips disabled ids, requires provider modules, type filtering |
 | `cinemeta.js` | IMDb -> TMDB resolution and caching |
-| `streams.js` | Provider orchestration, timeouts, dedupe, filtering, quality sorting |
+| `streams.js` | Provider orchestration, timeouts, dedupe, stream filtering/quality sorting, subtitle aggregation |
 | `filters.js` | URL config encoding/decoding, resolution/size detection, subtitle normalization, stream filtering |
 | `format.js` | Provider stream -> Stremio stream conversion |
 | `lib/lru.js` | Bounded TTL/LRU cache used by metadata and stream caches |
