@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: stremio-cb-addon
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci
+    startCommand: node server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PROVIDER_TIMEOUT_MS
+        value: "20000"
+      - key: ADDON_DEADLINE_MS
+        value: "25000"

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Syntax check
+        run: for f in *.js; do node --check "$f"; done
+
+      - name: Provider registry check
+        run: npm run verify
+
+      - name: Addon smoke test
+        run: |
+          PROVIDERS=netmirror node server.js &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID' EXIT
+          for i in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:7000/health >/dev/null && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:7000/manifest.json | grep -q 'community.cb-providers'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7000/stream/movie/not-an-id.json)" = "400"
+          curl -fsS http://127.0.0.1:7000/stream/series/tt0944947.json | grep -q '"streams":\[\]'
+          echo "smoke test passed"

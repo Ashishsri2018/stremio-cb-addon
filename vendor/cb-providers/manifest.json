@@ -1,0 +1,1243 @@
+{
+  "manifestVersion": 1,
+  "name": "CB Provider Repo",
+  "version": "2.5.0",
+  "description": "Auto-generated Nuvio provider plugin managed by Chole Bhature Ecosystem.",
+  "providers": [
+    {
+      "id": "moviesdrive",
+      "name": "MoviesDrive",
+      "description": "MoviesDrive streaming with HubCloud and Google Drive extraction",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/moviesdrive.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=moviesdrives.my&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "4khdhub",
+      "name": "4KHDHub",
+      "description": "4KHDHub direct links",
+      "version": "1.0.2",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/4khdhub.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=4khdhub.click&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "hdhub4u",
+      "name": "HDHub4u",
+      "description": "Direct links from HDHub4u with high-speed download support",
+      "version": "1.1.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/hdhub4u.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=new6.hdhub4u.fo&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "vegamovies",
+      "name": "VegaMovies",
+      "description": "VegaMovies stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vegamovies.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "castle",
+      "name": "Castle",
+      "description": "Multi Lang provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/castle.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://static.hbayy.com/simple-blog-13/prod/_nuxt/big-logo.DESZ4mBj.png",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "redflix",
+      "name": "RedFlix",
+      "description": "RedFlix stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/redflix.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "kurage",
+      "name": "Kurage",
+      "description": "Kurage.live anime streaming with tRPC API and multi-server proxy support",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/kurage.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://kurage.live/favicon.ico",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "anizone",
+      "name": "AniZone",
+      "description": "AniZone high-quality anime streaming with multi-audio and soft subtitles",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/anizone.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://anizone.to/favicon.ico",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "desiflix",
+      "name": "DesiFlix",
+      "description": "DesiFlix stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/desiflix.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "dahmermovies",
+      "name": "Dahmermovies",
+      "description": "Dahmer Movies streaming service. Can be slow at times to fetch and stream. Only use if needed.",
+      "version": "1.0.2",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/dahmermovies.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://image.similarpng.com/file/similarpng/very-thumbnail/2021/05/Letter-D-logo-design-template-with-geometric-shape-style-on-transparent-background-PNG.png",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "dahmermovies-tv",
+      "name": "Dahmermovies-TV",
+      "description": "Dahmermovies-TV stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "tv"
+      ],
+      "filename": "providers/dahmermovies-4k.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "moviebox",
+      "name": "MovieBox",
+      "description": "MovieBox streaming with multiple language support (DASH + MP4)",
+      "version": "1.1.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/moviebox.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://moviebox.ph/favicon.ico",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "moviesmod",
+      "name": "MoviesMod",
+      "description": "Movie and TV show streams from MoviesMod with multiple quality options",
+      "version": "1.0.1",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/moviesmod.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=moviesmod.farm&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "movix-vf",
+      "name": "Movix VF",
+      "description": "Movix VF stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/movix.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "fr"
+      ]
+    },
+    {
+      "id": "playimdb",
+      "name": "PlayIMDb",
+      "description": "PlayIMDb stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/playimdb.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "topcartoons",
+      "name": "TopCartoons",
+      "description": "TopCartoons stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "tv"
+      ],
+      "filename": "providers/topcartoons.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "torrentio",
+      "name": "Torrentio",
+      "description": "Torrentio stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/torrentio.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "vidrock",
+      "name": "VidRock",
+      "description": "VidRock stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidrock.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "reanime",
+      "name": "Reanime",
+      "description": "Reanime stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/reanime.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "animeworld",
+      "name": "AnimeWorld",
+      "description": "AnimeWorld stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/animeworld.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "animesalt",
+      "name": "AnimeSalt",
+      "description": "AnimeSalt stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/animesalt.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "anizen",
+      "name": "AniZen",
+      "description": "AniZen stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/anizen.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "netmirror",
+      "name": "NetMirror",
+      "description": "Streaming links from netmirror. Automatically disabled on iOS due to compatibility issues.",
+      "version": "1.0.3",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/netmirror.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "logo": "https://net22.cc/favicon.ico",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "anikage",
+      "name": "AniKage",
+      "description": "AniKage anime streaming with multi-subtitles and multi-servers",
+      "version": "2.4.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/anikage.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=anikage.cc&sz=128",
+      "contentLanguage": [
+        "en",
+        "ja"
+      ]
+    },
+    {
+      "id": "multimovies",
+      "name": "MultiMovies",
+      "description": "MultiMovies fast streaming servers with direct embeds and dual audio support",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/multimovies.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=multimovies.garden&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "toonstream",
+      "name": "ToonStream",
+      "description": "ToonStream direct anime and cartoon streaming with Hindi and English dubs",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/toonstream.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=toonstream.us&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi",
+        "ja"
+      ]
+    },
+    {
+      "id": "puretoons",
+      "name": "PureToons",
+      "description": "PureToons Indian cartoon & anime collection in Hindi dubs",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/puretoons.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=puretoons.in&sz=128",
+      "contentLanguage": [
+        "hi",
+        "en"
+      ]
+    },
+    {
+      "id": "einthusan",
+      "name": "Einthusan",
+      "description": "Premium South Asian movies in HD (Hindi, Tamil, Telugu, Malayalam, etc.)",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/einthusan.js",
+      "enabled": true,
+      "formats": [
+        "mp4"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=einthusan.tv&sz=128",
+      "contentLanguage": [
+        "hi",
+        "ta",
+        "te",
+        "ml",
+        "kn",
+        "bn",
+        "mr",
+        "pa"
+      ]
+    }
+  ],
+  "scrapers": [
+    {
+      "id": "moviesdrive",
+      "name": "MoviesDrive",
+      "description": "MoviesDrive streaming with HubCloud and Google Drive extraction",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/moviesdrive.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=moviesdrives.my&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "4khdhub",
+      "name": "4KHDHub",
+      "description": "4KHDHub direct links",
+      "version": "1.0.2",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/4khdhub.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=4khdhub.click&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "hdhub4u",
+      "name": "HDHub4u",
+      "description": "Direct links from HDHub4u with high-speed download support",
+      "version": "1.1.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/hdhub4u.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=new6.hdhub4u.fo&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "vegamovies",
+      "name": "VegaMovies",
+      "description": "VegaMovies stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vegamovies.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "castle",
+      "name": "Castle",
+      "description": "Multi Lang provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/castle.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://static.hbayy.com/simple-blog-13/prod/_nuxt/big-logo.DESZ4mBj.png",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "redflix",
+      "name": "RedFlix",
+      "description": "RedFlix stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/redflix.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "kurage",
+      "name": "Kurage",
+      "description": "Kurage.live anime streaming with tRPC API and multi-server proxy support",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/kurage.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://kurage.live/favicon.ico",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "anizone",
+      "name": "AniZone",
+      "description": "AniZone high-quality anime streaming with multi-audio and soft subtitles",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/anizone.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://anizone.to/favicon.ico",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "desiflix",
+      "name": "DesiFlix",
+      "description": "DesiFlix stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/desiflix.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "dahmermovies",
+      "name": "Dahmermovies",
+      "description": "Dahmer Movies streaming service. Can be slow at times to fetch and stream. Only use if needed.",
+      "version": "1.0.2",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/dahmermovies.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://image.similarpng.com/file/similarpng/very-thumbnail/2021/05/Letter-D-logo-design-template-with-geometric-shape-style-on-transparent-background-PNG.png",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "dahmermovies-tv",
+      "name": "Dahmermovies-TV",
+      "description": "Dahmermovies-TV stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "tv"
+      ],
+      "filename": "providers/dahmermovies-4k.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "moviebox",
+      "name": "MovieBox",
+      "description": "MovieBox streaming with multiple language support (DASH + MP4)",
+      "version": "1.1.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/moviebox.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://moviebox.ph/favicon.ico",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "moviesmod",
+      "name": "MoviesMod",
+      "description": "Movie and TV show streams from MoviesMod with multiple quality options",
+      "version": "1.0.1",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/moviesmod.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=moviesmod.farm&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "movix-vf",
+      "name": "Movix VF",
+      "description": "Movix VF stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/movix.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "fr"
+      ]
+    },
+    {
+      "id": "playimdb",
+      "name": "PlayIMDb",
+      "description": "PlayIMDb stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/playimdb.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "topcartoons",
+      "name": "TopCartoons",
+      "description": "TopCartoons stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "tv"
+      ],
+      "filename": "providers/topcartoons.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "torrentio",
+      "name": "Torrentio",
+      "description": "Torrentio stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/torrentio.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "vidrock",
+      "name": "VidRock",
+      "description": "VidRock stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/vidrock.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "en"
+      ]
+    },
+    {
+      "id": "reanime",
+      "name": "Reanime",
+      "description": "Reanime stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/reanime.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "animeworld",
+      "name": "AnimeWorld",
+      "description": "AnimeWorld stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/animeworld.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "animesalt",
+      "name": "AnimeSalt",
+      "description": "AnimeSalt stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/animesalt.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "anizen",
+      "name": "AniZen",
+      "description": "AniZen stream provider",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "anime",
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/anizen.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "logo": "",
+      "contentLanguage": [
+        "ja",
+        "en"
+      ]
+    },
+    {
+      "id": "netmirror",
+      "name": "NetMirror",
+      "description": "Streaming links from netmirror. Automatically disabled on iOS due to compatibility issues.",
+      "version": "1.0.3",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/netmirror.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "logo": "https://net22.cc/favicon.ico",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "anikage",
+      "name": "AniKage",
+      "description": "AniKage anime streaming with multi-subtitles and multi-servers",
+      "version": "2.4.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/anikage.js",
+      "enabled": true,
+      "formats": [
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=anikage.cc&sz=128",
+      "contentLanguage": [
+        "en",
+        "ja"
+      ]
+    },
+    {
+      "id": "multimovies",
+      "name": "MultiMovies",
+      "description": "MultiMovies fast streaming servers with direct embeds and dual audio support",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/multimovies.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=multimovies.garden&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "toonstream",
+      "name": "ToonStream",
+      "description": "ToonStream direct anime and cartoon streaming with Hindi and English dubs",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/toonstream.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=toonstream.us&sz=128",
+      "contentLanguage": [
+        "en",
+        "hi",
+        "ja"
+      ]
+    },
+    {
+      "id": "puretoons",
+      "name": "PureToons",
+      "description": "PureToons Indian cartoon & anime collection in Hindi dubs",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/puretoons.js",
+      "enabled": true,
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=puretoons.in&sz=128",
+      "contentLanguage": [
+        "hi",
+        "en"
+      ]
+    },
+    {
+      "id": "einthusan",
+      "name": "Einthusan",
+      "description": "Premium South Asian movies in HD (Hindi, Tamil, Telugu, Malayalam, etc.)",
+      "version": "1.0.0",
+      "author": "Chole Bhature",
+      "supportedTypes": [
+        "movie"
+      ],
+      "filename": "providers/einthusan.js",
+      "enabled": true,
+      "formats": [
+        "mp4"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=einthusan.tv&sz=128",
+      "contentLanguage": [
+        "hi",
+        "ta",
+        "te",
+        "ml",
+        "kn",
+        "bn",
+        "mr",
+        "pa"
+      ]
+    }
+  ],
+  "author": "Chole Bhature"
+}
