@@ -10,7 +10,7 @@ Stremio client
   v
 server.js (Node >=18, Render)
   |-- cinemeta.js   IMDb ID -> TMDB ID (Cinemeta and TMDB raced, bounded LRU, 24h/60s TTL)
-  |-- providers.js  loads vendor/cb-providers/manifest.json, filters by media type
+  |-- providers.js  loads vendor/cb-providers/manifest.json, skips disabled ids, filters by media type
   |-- streams.js    runs providers in parallel (20s each, 25s overall deadline)
   |     |-- lib/breaker.js: per-provider circuit breaker (3 failures -> 5 min open)
   |     |-- lib/stream-cache.js: 3 min raw result cache, bounded, coalesces requests
@@ -41,7 +41,7 @@ Stream routes:
 - Series without season/episode returns `200 {"streams":[]}` because providers require an episode.
 - Invalid IMDb ID returns `400`; unknown routes return `404`; unexpected failures return `500`.
 - All routes accept `GET` and `HEAD`; `HEAD` runs the same route logic with the body suppressed, so uptime pingers such as UptimeRobot get a 200. Other methods return `405`.
-- `GET /health` returns `{ ok, providers, uptimeSec, circuits: { open, halfOpen }, cacheEntries }` (cheap; used by Render).
+- `GET /health` returns `{ ok, providers, uptimeSec, circuits: { open, halfOpen }, cacheEntries }` (cheap; used by Render); `providers` is the active (non-disabled) count.
 - `GET /stats` returns detailed in-memory telemetry: per-provider circuit state and counters, stream cache stats, and metadata cache stats.
 - `GET /logo.png` serves the addon logo used by `/manifest.json`.
 
@@ -73,7 +73,7 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 | --- | --- |
 | `server.js` | HTTP server, routing, CORS, manifest, logo, JSON responses |
 | `config.js` | Environment configuration with defaults |
-| `providers.js` | Reads vendored manifest, requires provider modules, type filtering |
+| `providers.js` | Reads vendored manifest, skips disabled ids, requires provider modules, type filtering |
 | `cinemeta.js` | IMDb -> TMDB resolution and caching |
 | `streams.js` | Provider orchestration, timeouts, dedupe, filtering, quality sorting |
 | `filters.js` | URL config encoding/decoding, resolution/size detection, subtitle normalization, stream filtering |
@@ -83,7 +83,7 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 | `lib/stream-cache.js` | 3-minute raw stream cache with in-flight coalescing |
 | `lib/timeout.js` | `TimeoutError` and promise timeout helper |
 | `configure.html` | Self-contained `/configure` page that builds the encoded manifest URL |
-| `scripts/verify.js` | Verifies every enabled provider module loads (used by CI and sync) |
+| `scripts/verify.js` | Verifies every enabled, non-disabled provider module loads and disabled ids stay out (used by CI and sync) |
 | `scripts/check-audit.js` | `npm audit` gate: fails on new high/critical advisories, allows the unfixable legacy `cheerio-without-node-native` chain |
 | `scripts/test-filters.js` | Unit tests for config, filters, and stream formatting (`npm test`) |
 | `scripts/test-runtime.js` | Unit tests for cache, breaker, timeout, metadata race, and collector integration (`npm test`) |
@@ -98,11 +98,12 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 - Upstream source: `https://github.com/SA7ANI/cb-providers` (GPL-3.0).
 - Vendored, not used as a submodule, so Render needs no submodule support.
 - `manifest.json` fields used: `id`, `name`, `filename`, `enabled`, `supportedTypes`.
+- Torrent providers (`torrentio`) are listed in `DISABLED_PROVIDER_IDS` in `providers.js`. Their files and manifest entries stay vendored and sync daily, but they are never loaded or queried and do not appear in registry-derived counts.
 - Provider modules export `getStreams(tmdbId, mediaType, season, episode)` where `mediaType` is `movie` or `tv`.
 - Outcomes per call: non-empty valid array = `ok`, empty = `empty` (legitimate no-match), thrown error = `error`, timeout = `timeout`. Only errors and timeouts count toward the breaker.
 - Type mapping: a movie request loads providers supporting `movie`; a series request loads providers supporting `tv` or `anime`.
 - Runtime dependencies required by provider bundles: `cheerio`, `cheerio-without-node-native`, `axios`, `crypto-js`.
-- `scripts/verify.js` fails if any enabled provider cannot be loaded; the sync workflow runs it before committing new upstream code.
+- `scripts/verify.js` fails if any enabled, non-disabled provider cannot be loaded; the sync workflow runs it before committing new upstream code.
 
 ## Runtime resilience
 
@@ -124,7 +125,7 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 | `PROVIDER_DIR` | `vendor/cb-providers/providers` | Provider bundle directory |
 | `PROVIDER_TIMEOUT_MS` | `20000` | Per-provider timeout |
 | `ADDON_DEADLINE_MS` | `25000` | Overall time budget per stream request |
-| `PROVIDERS` | all enabled | Comma-separated provider allowlist |
+| `PROVIDERS` | all enabled | Comma-separated active-provider allowlist; disabled ids are always excluded |
 | `CINEMETA_URL` | `https://v3-cinemeta.strem.io` | Metadata resolver base URL |
 | `TMDB_API_KEY` | empty | Enables the TMDB resolver, raced in parallel with Cinemeta |
 | `BREAKER_FAILURE_THRESHOLD` | `3` | Consecutive timeouts/errors before a provider circuit opens |
@@ -153,7 +154,7 @@ Filters are encoded in the addon URL as base64url JSON and applied per request o
 - The live service stores a user-supplied `TMDB_API_KEY` as an encrypted Render env var (never committed). It is used only by the Cinemeta fallback resolver; provider-embedded TMDB keys are unaffected.
 - CI (`.github/workflows/ci.yml`): on push/PR, runs `npm ci`, ESLint (`npm run lint`), syntax check (root + `lib/`), provider registry verification, dependency audit gate (`scripts/check-audit.js`), unit tests (`npm test`: filters + runtime), and HTTP smoke tests including `/health`, `/stats`, `/configure`, and configured routes.
 - Node is pinned to 22 via `.nvmrc` for both CI and Render.
-- Sync (`.github/workflows/sync-upstream.yml`): daily at 03:17 UTC (also manual). It vendors the latest upstream providers, verifies the full provider set, and commits only when valid. The resulting commit triggers CI.
+- Sync (`.github/workflows/sync-upstream.yml`): daily at 03:17 UTC (also manual). It vendors the latest upstream providers (including disabled ones), verifies the active provider set, and commits only when valid. The resulting commit triggers CI.
 - Keep-alive (`.github/workflows/keep-alive.yml`): four daily 5h50m jobs ping `/health` every 10 minutes so the free instance does not sleep; this shape costs ~1,400 Actions minutes/month instead of ~4,320 for a separate 10-minute cron.
 - Docs-only commits use `[skip ci]` (plus `[skip render]`) to avoid unnecessary builds.
 - Render uses `autoDeployTrigger: checksPass`, so deploys start only after the CI checks for the commit pass.

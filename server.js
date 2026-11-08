@@ -47,7 +47,7 @@ function manifestFor(req) {
     version: '1.0.0',
     name: config.addonName,
     description:
-      'Multi-provider stream addon powered by the CB Providers fleet (MoviesDrive, 4KHDHub, HDHub4u, VegaMovies, NetMirror, Torrentio, anime providers and more). Resolves content from IMDb IDs. Configure resolution, size, and subtitle filters at /configure.',
+      'Multi-provider stream addon powered by the CB Providers fleet (MoviesDrive, 4KHDHub, HDHub4u, VegaMovies, NetMirror, anime providers and more). Resolves content from IMDb IDs. Configure resolution, size, and subtitle filters at /configure.',
     logo: `${baseUrl(req)}/logo.png`,
     types: ['movie', 'series'],
     resources: ['stream'],

@@ -4,6 +4,10 @@ const config = require('./config');
 
 let registry = null;
 
+// Torrent providers stay vendored so the daily sync keeps them updated, but
+// they are never loaded or queried. The vendored manifest has no source-type field.
+const DISABLED_PROVIDER_IDS = new Set(['torrentio']);
+
 function loadProvider(entry) {
   const file = path.join(config.providerDir, path.basename(entry.filename));
   const mod = require(file);
@@ -31,7 +35,10 @@ function getRegistry() {
   const manifest = JSON.parse(fs.readFileSync(config.providerManifest, 'utf8'));
   const allow = config.onlyProviders;
   const entries = (manifest.providers || []).filter(
-    (p) => p.enabled !== false && (allow.length === 0 || allow.includes(p.id))
+    (p) =>
+      p.enabled !== false &&
+      !DISABLED_PROVIDER_IDS.has(p.id) &&
+      (allow.length === 0 || allow.includes(p.id))
   );
 
   registry = [];
@@ -45,7 +52,10 @@ function getRegistry() {
     }
   }
 
-  console.log(`[providers] loaded ${registry.length}/${entries.length}`);
+  const disabled = [...DISABLED_PROVIDER_IDS].join(', ') || 'none';
+  console.log(
+    `[providers] loaded ${registry.length}/${entries.length} (disabled: ${disabled})`
+  );
   return registry;
 }
 
@@ -54,4 +64,4 @@ function providersFor(mediaType) {
   return getRegistry().filter((p) => p.types.some((t) => wanted.includes(t)));
 }
 
-module.exports = { getRegistry, providersFor };
+module.exports = { DISABLED_PROVIDER_IDS, getRegistry, providersFor };

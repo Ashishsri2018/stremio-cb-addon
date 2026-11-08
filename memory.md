@@ -13,15 +13,22 @@ Conventions:
 - Repo: `https://github.com/Ashishsri2018/stremio-cb-addon` (private, GPL-3.0)
 - Live addon: `https://stremio-cb-addon.onrender.com` (install with `/manifest.json`)
 - Render service: `srv-dbo0nv3rjlhs73a3qavg`, free plan, Singapore, health `/health`
-- Providers: 28 vendored from `SA7ANI/cb-providers`, upstream SHA `40514501c0505474bc6a0d8e1d9821c2a2e37020`
+- Providers: 28 vendored from `SA7ANI/cb-providers`, 27 active (Torrentio disabled in addon code but kept for daily sync), upstream SHA `40514501c0505474bc6a0d8e1d9821c2a2e37020`
 - CI/CD: GitHub Actions CI on push; upstream sync daily 03:17 UTC; Render auto-deploy after CI checks pass
-- Verified live: `/health` shows 28 providers; `tt0137523` returned 66 streams from 12 providers (70 streams / 16 providers locally)
+- Verified live before the torrent disable: `/health` showed 28 providers; `tt0137523` returned 66 streams from 12 providers (70 streams / 16 providers locally)
 - Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
 - TMDB fallback: user-supplied key stored as a Render secret (not in git); providers still use their embedded keys
 - Runtime resilience: per-provider circuit breaker + `/stats`; Cinemeta/TMDB raced in parallel; raw stream results cached 3 min
 - Keep-alive: `.github/workflows/keep-alive.yml` pings `/health` every 10 min via four daily 5h50m jobs (~1,400 Actions min/month)
 
 ## Log
+
+### 2026-11-08 - Torrent providers disabled
+
+- `torrentio` is the only torrent-based provider in the vendored fleet. `DISABLED_PROVIDER_IDS` in `providers.js` now excludes it when the registry is built, so it is never loaded or queried and no longer appears in `/health`, `/stats`, or stream ordering.
+- The provider file and manifest entry are untouched; the daily sync still copies every upstream provider, so Torrentio keeps updating without ever running.
+- `scripts/verify.js` now expects 27 active providers, fails if a disabled id is loaded, and warns if a disabled id disappears from the manifest. The addon manifest description no longer advertises Torrentio.
+- Verification: lint and tests pass; `npm run verify` -> 27/27; `PROVIDERS=torrentio` starts with 0 providers and returns `{"streams":[]}`; default startup reports 27 providers with no Torrentio in `/stats`.
 
 ### 2026-11-08 - HEAD support for uptime pingers
 
