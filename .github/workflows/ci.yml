@@ -44,6 +44,8 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:7000/health | grep -q 'uptimeSec'
+          test "$(curl -s -o /dev/null -w '%{http_code}' -I http://127.0.0.1:7000/)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -I http://127.0.0.1:7000/health)" = "200"
           curl -fsS http://127.0.0.1:7000/stats | grep -q '"circuits"'
           curl -fsS http://127.0.0.1:7000/stats | grep -q '"streamCache"'
           curl -fsS http://127.0.0.1:7000/manifest.json | grep -q 'community.cb-providers'

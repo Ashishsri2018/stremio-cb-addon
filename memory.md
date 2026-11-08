@@ -23,6 +23,12 @@ Conventions:
 
 ## Log
 
+### 2026-11-08 - HEAD support for uptime pingers
+
+- UptimeRobot reported `405 Method Not Allowed` because the server only admitted GET/OPTIONS. The method gate now also admits HEAD; Node suppresses the response body for HEAD, so status and headers match GET.
+- `access-control-allow-methods` now lists `GET, HEAD, OPTIONS`.
+- CI smoke test asserts `HEAD /` and `HEAD /health` return 200.
+
 ### 2026-11-08 - Render keep-alive workflow
 
 - Added `.github/workflows/keep-alive.yml`: scheduled at 01:17/07:17/13:17/19:17 UTC; each run pings `/health` every 10 minutes for 5h50m.

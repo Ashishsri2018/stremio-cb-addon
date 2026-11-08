@@ -40,6 +40,7 @@ Stream routes:
 - Series episode: `/stream/series/tt0944947:1:1.json` (`id = imdbId:season:episode`)
 - Series without season/episode returns `200 {"streams":[]}` because providers require an episode.
 - Invalid IMDb ID returns `400`; unknown routes return `404`; unexpected failures return `500`.
+- All routes accept `GET` and `HEAD`; `HEAD` runs the same route logic with the body suppressed, so uptime pingers such as UptimeRobot get a 200. Other methods return `405`.
 - `GET /health` returns `{ ok, providers, uptimeSec, circuits: { open, halfOpen }, cacheEntries }` (cheap; used by Render).
 - `GET /stats` returns detailed in-memory telemetry: per-provider circuit state and counters, stream cache stats, and metadata cache stats.
 - `GET /logo.png` serves the addon logo used by `/manifest.json`.

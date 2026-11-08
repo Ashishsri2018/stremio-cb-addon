@@ -90,13 +90,13 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'access-control-allow-origin': '*',
-      'access-control-allow-methods': 'GET, OPTIONS',
+      'access-control-allow-methods': 'GET, HEAD, OPTIONS',
       'access-control-allow-headers': 'Content-Type',
     });
     res.end();
     return;
   }
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
     sendJson(res, 405, { error: 'Method not allowed' });
     return;
   }
