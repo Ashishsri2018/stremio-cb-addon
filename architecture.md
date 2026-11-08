@@ -120,6 +120,7 @@ Filters are encoded in the addon URL as base64url JSON and applied per request o
 
 - Render web service, free plan, Singapore: `https://stremio-cb-addon.onrender.com`
 - Build: `npm ci`; start: `node server.js`; health check: `/health`.
+- The live service stores a user-supplied `TMDB_API_KEY` as an encrypted Render env var (never committed). It is used only by the Cinemeta fallback resolver; provider-embedded TMDB keys are unaffected.
 - CI (`.github/workflows/ci.yml`): on push/PR, runs `npm ci`, syntax check, provider registry verification, filter unit tests (`npm test`), and HTTP smoke tests including `/configure` and configured routes.
 - Sync (`.github/workflows/sync-upstream.yml`): daily at 03:17 UTC (also manual). It vendors the latest upstream providers, verifies the full provider set, and commits only when valid. The resulting commit triggers Render auto-deploy.
 - Docs-only commits use `[skip ci]` (plus `[skip render]`) to avoid unnecessary builds.

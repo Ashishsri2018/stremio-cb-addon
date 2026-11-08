@@ -17,8 +17,18 @@ Conventions:
 - CI/CD: GitHub Actions CI on push; upstream sync daily 03:17 UTC; Render auto-deploy on commit
 - Verified live: `/health` shows 28 providers; `tt0137523` returned 66 streams from 12 providers (70 streams / 16 providers locally)
 - Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
+- TMDB fallback: user-supplied key stored as a Render secret (not in git); providers still use their embedded keys
 
 ## Log
+
+### 2026-11-08 - Credential audit and TMDB fallback key
+
+- Audited all 28 providers: none needs a user-supplied API key, login, or cookie to return streams.
+- Providers embed their own TMDB keys. Three of the four shared keys are valid and one is dead, but every provider retains at least one working key. No provider reads `process.env`.
+- Cookies are automatic: MoviesMod mints per-request anti-bot and PHPSESSID cookies, MovieBox uses an anonymous bearer token plus a signed playback Cookie (forwarded via `proxyHeaders`), HDHub4u ships a static bypass Cookie, and Einthusan logs in only if `premiumEmail`/`premiumPassword` are injected via `globalThis.SCRAPER_SETTINGS` (not required for free streams).
+- Only Torrentio (optional Debrid provider/key) and Einthusan (language toggles) expose provider settings; this addon does not inject `SCRAPER_SETTINGS`, so defaults apply.
+- Set the user-provided TMDB key as an encrypted Render env var (`TMDB_API_KEY`) for the Cinemeta-to-TMDB fallback. The value is not committed; `render.yaml` declares it with `sync: false`.
+- Local verification: with Cinemeta unreachable, `tt0137523` resolved to TMDB 550 through the fallback.
 
 ### 2026-11-08 - Configurable filters and /configure page
 
@@ -61,6 +71,7 @@ Conventions:
 
 ## Open items
 
+- Provider-level optional settings (Torrentio Debrid key, Einthusan premium login/language toggles) are not exposed by this Stremio addon; providers read them from `globalThis.SCRAPER_SETTINGS`, which is never set.
 - Add a min-resolution floor if requested (the current resolution filter is a ceiling).
 - Consider enabling Render "Auto-Deploy -> After CI Checks Pass" to gate deploys on CI.
 - Consider a keep-alive strategy for Render free-tier cold starts.
