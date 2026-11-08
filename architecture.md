@@ -13,8 +13,9 @@ server.js (Node >=18, Render)
   |-- providers.js  loads vendor/cb-providers/manifest.json, filters by media type
   |-- streams.js    runs providers in parallel (20s each, 25s overall deadline)
   |     |-- provider.getStreams(tmdbId, movie|tv, season, episode)
-  |     |-- format.js: normalize to Stremio streams (proxyHeaders, notWebReady, bingeGroup)
-  |     `-- dedupe by URL, sort by quality rank
+  |     |-- dedupe by URL, then filters.js: user resolution/size/subtitle filters
+  |     |-- format.js: normalize to Stremio streams (subtitles, videoSize, proxyHeaders, notWebReady, bingeGroup)
+  |     `-- sort by quality rank
   v
 { "streams": [ ... ] }
 ```
@@ -28,6 +29,7 @@ Manifest (`/manifest.json`):
 - `types`: `["movie", "series"]`
 - `idPrefixes`: `["tt"]`
 - `catalogs`: `[]`
+- `behaviorHints.configurable`: `true`; `/configure` serves the settings page.
 
 Stream routes:
 
@@ -38,6 +40,13 @@ Stream routes:
 - `GET /health` returns `{ ok: true, providers: <loaded count> }`.
 - `GET /logo.png` serves the addon logo used by `/manifest.json`.
 
+Configured routes (settings encoded as base64url JSON in the path, no server-side state):
+
+- Manifest: `/{config}/manifest.json`
+- Stream: `/{config}/stream/{movie|series}/{id}.json`
+- `GET /configure` serves the HTML builder that generates these URLs and a `stremio://` install link.
+- A path segment that does not decode to a JSON object returns `400 {"error":"Invalid configuration"}`; plain routes use permissive defaults.
+
 Stream object mapping (format.js):
 
 - `name` = provider display name from the vendored manifest.
@@ -46,6 +55,8 @@ Stream object mapping (format.js):
 - `infoHash` + `fileIdx` used when the provider returns no URL.
 - Provider `headers` become `behaviorHints.proxyHeaders.request` with `notWebReady: true`.
 - Provider `behaviorHints.bingeGroup` is preserved.
+- Provider `subtitles` tracks are normalized to Stremio subtitle objects (`{id,url,lang}`) from `url`/`file`/`src` and `lang`/`language`/`label`.
+- Provider `size` or size text in the title becomes `behaviorHints.videoSize`.
 
 Stream results are never cached: many provider URLs are time-signed and expire.
 
@@ -57,9 +68,12 @@ Stream results are never cached: many provider URLs are time-signed and expire.
 | `config.js` | Environment configuration with defaults |
 | `providers.js` | Reads vendored manifest, requires provider modules, type filtering |
 | `cinemeta.js` | IMDb -> TMDB resolution and caching |
-| `streams.js` | Provider orchestration, timeouts, dedupe, quality sorting |
+| `streams.js` | Provider orchestration, timeouts, dedupe, filtering, quality sorting |
+| `filters.js` | URL config encoding/decoding, resolution/size detection, subtitle normalization, stream filtering |
 | `format.js` | Provider stream -> Stremio stream conversion |
+| `configure.html` | Self-contained `/configure` page that builds the encoded manifest URL |
 | `scripts/verify.js` | Verifies every enabled provider module loads (used by CI and sync) |
+| `scripts/test-filters.js` | Unit tests for config, filters, and stream formatting (`npm test`) |
 | `vendor/cb-providers/` | Upstream GPL-3.0 snapshot: `providers/`, `manifest.json`, `LICENSE`, `UPSTREAM_COMMIT` |
 | `render.yaml` | Render blueprint matching the live service |
 | `.github/workflows/` | CI and daily upstream sync |
@@ -89,11 +103,24 @@ Stream results are never cached: many provider URLs are time-signed and expire.
 | `CINEMETA_URL` | `https://v3-cinemeta.strem.io` | Metadata resolver base URL |
 | `TMDB_API_KEY` | empty | Optional fallback when Cinemeta lacks `moviedb_id` |
 
+## User filters
+
+Filters are encoded in the addon URL as base64url JSON and applied per request on raw provider streams:
+
+| Key | Values | Behavior |
+| --- | --- | --- |
+| `maxRes` | `any`, `2160`, `1080`, `720`, `480` | Hides streams above the ceiling. Resolution comes from `quality` or title/description text. |
+| `maxSizeGB` | number or `null` | Hides streams larger than the limit. Size comes from provider `size` or `GB`/`MB` text. |
+| `keepUnknown` | boolean, default `true` | When false, streams without detectable resolution/size/subtitle metadata are dropped. |
+| `subtitles` | `any`, `required`, `en`, `hi`, `ta`, `te`, `ml`, `ja`, `multi` | Matches provider subtitle tracks first, then filename hints (e.g. `E-Sub`). Streams with no subtitle info follow `keepUnknown`. |
+
+`/configure` writes these values into the manifest URL. Users switch filters by installing a new URL.
+
 ## Deployment and CI/CD
 
 - Render web service, free plan, Singapore: `https://stremio-cb-addon.onrender.com`
 - Build: `npm ci`; start: `node server.js`; health check: `/health`.
-- CI (`.github/workflows/ci.yml`): on push/PR, runs `npm ci`, syntax check, provider registry verification, and HTTP smoke tests.
+- CI (`.github/workflows/ci.yml`): on push/PR, runs `npm ci`, syntax check, provider registry verification, filter unit tests (`npm test`), and HTTP smoke tests including `/configure` and configured routes.
 - Sync (`.github/workflows/sync-upstream.yml`): daily at 03:17 UTC (also manual). It vendors the latest upstream providers, verifies the full provider set, and commits only when valid. The resulting commit triggers Render auto-deploy.
 - Docs-only commits use `[skip ci]` (plus `[skip render]`) to avoid unnecessary builds.
 - Render auto-deploy is not gated on CI by default; enable "Auto-Deploy -> After CI Checks Pass" in the service settings if desired.
@@ -103,7 +130,7 @@ Stream results are never cached: many provider URLs are time-signed and expire.
 - **Render free tier sleeps after 15 minutes idle.** The first request afterward cold-starts and may exceed Stremio's request timeout.
 - **Datacenter IP blocking.** Some upstream sites reject cloud IPs, so fewer providers respond on Render than locally.
 - **Signed URLs expire.** Streams are resolved on demand and not persisted; response times are bounded by the 20s/25s timeouts.
-- **Quality is sorted, not filtered.** Providers can return 480p/360p/CAM for older or regional titles.
+- **Filtering is opt-in.** Plain routes only sort by quality; configured routes apply resolution/size/subtitle filters. Metadata is provider-supplied, so unknown values are controlled by `keepUnknown`.
 - **Upstream drift.** A new provider may require a new npm dependency; the sync workflow's verification fails before committing in that case, so the fix is to add the dependency and re-run the sync.
 
 ## Maintenance

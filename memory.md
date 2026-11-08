@@ -16,8 +16,19 @@ Conventions:
 - Providers: 28 vendored from `SA7ANI/cb-providers`, upstream SHA `40514501c0505474bc6a0d8e1d9821c2a2e37020`
 - CI/CD: GitHub Actions CI on push; upstream sync daily 03:17 UTC; Render auto-deploy on commit
 - Verified live: `/health` shows 28 providers; `tt0137523` returned 66 streams from 12 providers (70 streams / 16 providers locally)
+- Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
 
 ## Log
+
+### 2026-11-08 - Configurable filters and /configure page
+
+- Added `/configure`, a self-contained dark HTML page that generates an encoded manifest URL and a `stremio://` install link.
+- Config keys: `maxRes` (`any|2160|1080|720|480`), `maxSizeGB` (number or null), `keepUnknown` (default `true`), `subtitles` (`any|required|en|hi|ta|te|ml|ja|multi`).
+- Added configured routes `/{config}/manifest.json` and `/{config}/stream/{type}/{id}.json`; invalid configs return 400. Plain routes keep permissive defaults.
+- Manifest now advertises `behaviorHints.configurable: true`; stream output now includes normalized `subtitles` and `behaviorHints.videoSize`.
+- Filters run on raw provider streams before formatting. Unknown resolution/size/subtitle metadata is kept only when `keepUnknown` is true.
+- Added `scripts/test-filters.js` (`npm test`) and CI smoke checks for `/configure` and configured routes.
+- Deployed commit `193b971`: CI passed, Render went Live. Strict config (`1080p`, `2 GB`, no unknowns, subtitles required) reduced `tt0137523` from 66 to 2 valid MoviesDrive streams (720p/1.36 GB and 480p/484 MB, both with E-Sub hints).
 
 ### 2026-11-08 - Documentation added
 
@@ -50,7 +61,7 @@ Conventions:
 
 ## Open items
 
-- Add optional `MIN_QUALITY` filter (discussed, not implemented).
+- Add a min-resolution floor if requested (the current resolution filter is a ceiling).
 - Consider enabling Render "Auto-Deploy -> After CI Checks Pass" to gate deploys on CI.
 - Consider a keep-alive strategy for Render free-tier cold starts.
 - Datacenter IP blocking limits provider coverage on Render; a residential/self-hosted deployment may return more sources.
