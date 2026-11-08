@@ -14,13 +14,31 @@ Conventions:
 - Live addon: `https://stremio-cb-addon.onrender.com` (install with `/manifest.json`)
 - Render service: `srv-dbo0nv3rjlhs73a3qavg`, free plan, Singapore, health `/health`
 - Providers: 28 vendored from `SA7ANI/cb-providers`, upstream SHA `40514501c0505474bc6a0d8e1d9821c2a2e37020`
-- CI/CD: GitHub Actions CI on push; upstream sync daily 03:17 UTC; Render auto-deploy on commit
+- CI/CD: GitHub Actions CI on push; upstream sync daily 03:17 UTC; Render auto-deploy after CI checks pass
 - Verified live: `/health` shows 28 providers; `tt0137523` returned 66 streams from 12 providers (70 streams / 16 providers locally)
 - Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
 - TMDB fallback: user-supplied key stored as a Render secret (not in git); providers still use their embedded keys
 - Runtime resilience: per-provider circuit breaker + `/stats`; Cinemeta/TMDB raced in parallel; raw stream results cached 3 min
+- Keep-alive: `.github/workflows/keep-alive.yml` pings `/health` every 10 min via four daily 5h50m jobs (~1,400 Actions min/month)
 
 ## Log
+
+### 2026-11-08 - Render keep-alive workflow
+
+- Added `.github/workflows/keep-alive.yml`: scheduled at 01:17/07:17/13:17/19:17 UTC; each run pings `/health` every 10 minutes for 5h50m.
+- A separate run every 10 minutes would bill ~4,320 Actions minutes/month, over the 2,000 free private-repo quota. Four long jobs cost ~1,400 minutes and leave a 10-minute gap, below Render's 15-minute sleep threshold.
+- The job fails after 3 consecutive non-200 pings; `workflow_dispatch` starts a full shift on demand. No event data is interpolated into the script.
+- Verified locally: YAML parses, the loop pings success and exits 0, and a dead endpoint exits 1 after 3 failures.
+
+### 2026-11-08 - CI hardening, graceful shutdown, filter prototype fix
+
+- Fixed the direct-quality lookup in `filters.js`: the table now has a null prototype and uses `Object.hasOwn`, so values such as `constructor` or `__proto__` cannot hit `Object.prototype`. Added regression assertions.
+- Added ESLint 10 (flat config) and `npm run lint`; CI lints addon sources and excludes vendored providers.
+- Added `scripts/check-audit.js`: `npm audit --omit=dev --audit-level=high` passes only while high/critical advisories are limited to the known, unfixable `cheerio-without-node-native` -> `jsdom 7`/`request` chain. Any new high/critical advisory fails CI.
+- Pinned Node 22 in `.nvmrc`; CI now uses `node-version-file`. Added weekly Dependabot updates for npm and GitHub Actions.
+- `render.yaml` now uses `autoDeployTrigger: checksPass`, so Render deploys only after CI passes.
+- `configure.html` is read once at startup. `SIGTERM`/`SIGINT` now stop the listener, close idle keep-alive sockets, and drain in-flight requests for up to 25s before exiting.
+- Verification: lint clean; audit gate passes with four allowlisted advisories; `npm test` passes (9 filter + 26 runtime checks); `npm run verify` loads 28/28; `/configure` and `/stats` served locally; SIGTERM exited 0 in ~120ms.
 
 ### 2026-11-08 - Circuit breaker, parallel metadata, stream cache
 
@@ -86,6 +104,6 @@ Conventions:
 - Implement a soft deadline (~10s) that returns partial results instead of waiting for the full 25s deadline.
 - Provider-level optional settings (Torrentio Debrid key, Einthusan premium login/language toggles) are not exposed by this Stremio addon; providers read them from `globalThis.SCRAPER_SETTINGS`, which is never set.
 - Add a min-resolution floor if requested (the current resolution filter is a ceiling).
-- Consider enabling Render "Auto-Deploy -> After CI Checks Pass" to gate deploys on CI.
+- Re-review the audit allowlist if `cheerio-without-node-native` is replaced; it currently pins the legacy `request`/`jsdom` tree.
 - Consider a keep-alive strategy for Render free-tier cold starts.
 - Datacenter IP blocking limits provider coverage on Render; a residential/self-hosted deployment may return more sources.

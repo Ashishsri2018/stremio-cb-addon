@@ -9,10 +9,18 @@ const { DEFAULT_CONFIG, decodeConfig } = require('./filters');
 const logoPath = path.join(__dirname, 'logo.png');
 const configurePath = path.join(__dirname, 'configure.html');
 const startedAt = Date.now();
+const shutdownTimeoutMs = 25000;
 const streamRoute = /^\/stream\/(movie|series)\/([^/]+)\.json$/;
 const configManifestRoute = /^\/([A-Za-z0-9_-]{1,512})\/manifest\.json$/;
 const configStreamRoute = /^\/([A-Za-z0-9_-]{1,512})\/stream\/(movie|series)\/([^/]+)\.json$/;
 const imdbPattern = /^(tt\d+)(?::(\d+):(\d+))?$/;
+
+let configureHtml = null;
+try {
+  configureHtml = fs.readFileSync(configurePath);
+} catch (err) {
+  console.error(`[server] failed to load configure.html: ${err.message}`);
+}
 
 function sendJson(res, status, body, cacheControl = 'no-store') {
   res.writeHead(status, {
@@ -106,17 +114,15 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/configure') {
-    fs.readFile(configurePath, (err, data) => {
-      if (err) {
-        sendJson(res, 500, { error: 'Configure page unavailable' });
-        return;
-      }
-      res.writeHead(200, {
-        'content-type': 'text/html; charset=utf-8',
-        'cache-control': 'public, max-age=300',
-      });
-      res.end(data);
+    if (!configureHtml) {
+      sendJson(res, 500, { error: 'Configure page unavailable' });
+      return;
+    }
+    res.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'public, max-age=300',
     });
+    res.end(configureHtml);
     return;
   }
 
@@ -215,3 +221,25 @@ server.listen(config.port, config.host, () => {
   console.log(`Manifest: ${config.providerManifest}`);
   console.log(`Providers: ${getRegistry().length}`);
 });
+
+let shuttingDown = false;
+
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[server] ${signal} received, draining connections`);
+  server.close(() => {
+    console.log('[server] shutdown complete');
+    process.exit(0);
+  });
+  if (typeof server.closeIdleConnections === 'function') {
+    server.closeIdleConnections();
+  }
+  setTimeout(() => {
+    console.error('[server] shutdown timed out, exiting');
+    process.exit(1);
+  }, shutdownTimeoutMs).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

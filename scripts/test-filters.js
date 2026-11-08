@@ -45,6 +45,9 @@ check('resolution detection', () => {
   assert.strictEqual(resolutionOf({ quality: 'SD' }), 480);
   assert.strictEqual(resolutionOf({ title: 'Movie 360p' }), 360);
   assert.strictEqual(resolutionOf({ title: 'Unknown quality' }), null);
+  assert.strictEqual(resolutionOf({ quality: 'constructor' }), null);
+  assert.strictEqual(resolutionOf({ quality: '__proto__' }), null);
+  assert.strictEqual(resolutionOf({ quality: 'hasOwnProperty' }), null);
 });
 
 check('size detection', () => {

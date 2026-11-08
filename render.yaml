@@ -7,7 +7,7 @@ services:
     buildCommand: npm ci
     startCommand: node server.js
     healthCheckPath: /health
-    autoDeploy: true
+    autoDeployTrigger: checksPass
     envVars:
       - key: PROVIDER_TIMEOUT_MS
         value: "20000"

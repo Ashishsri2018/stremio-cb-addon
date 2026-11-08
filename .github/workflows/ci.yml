@@ -14,16 +14,22 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
+
+      - name: Lint
+        run: npm run lint
 
       - name: Syntax check
         run: for f in *.js lib/*.js; do node --check "$f"; done
 
       - name: Provider registry check
         run: npm run verify
+
+      - name: Dependency audit
+        run: node scripts/check-audit.js
 
       - name: Filter tests
         run: npm test

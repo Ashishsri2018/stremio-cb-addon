@@ -51,10 +51,17 @@ const RES_PATTERNS = [
   [/\b360p?\b/i, 360],
 ];
 
+const DIRECT_RES = Object.assign(Object.create(null), {
+  '4k': 2160, '2160': 2160, '2160p': 2160,
+  '1080': 1080, '1080p': 1080,
+  '720': 720, '720p': 720,
+  '480': 480, '480p': 480,
+  '360': 360, '360p': 360,
+});
+
 function resolutionOf(stream) {
   const quality = String(stream.quality || '').trim().toLowerCase();
-  const direct = { '4k': 2160, '2160': 2160, '2160p': 2160, '1080': 1080, '1080p': 1080, '720': 720, '720p': 720, '480': 480, '480p': 480, '360': 360, '360p': 360 };
-  if (direct[quality]) return direct[quality];
+  if (Object.hasOwn(DIRECT_RES, quality)) return DIRECT_RES[quality];
 
   const text = [stream.quality, stream.title, stream.description, stream.name]
     .filter((value) => typeof value === 'string' && value.length > 0)

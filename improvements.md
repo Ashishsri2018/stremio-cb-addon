@@ -4,7 +4,7 @@ Reviewed 2026-11-08. Baseline: 9/9 filter tests pass, 28/28 providers load. The 
 
 ## Status (2026-11-08)
 
-Implemented: item 2 (circuit breaker + `/stats`), item 3 (parallel IMDb→TMDB + bounded cache), and item 4 (3-minute bounded stream cache with in-flight coalescing). Item 1 (soft deadline) and the remaining items are still open.
+Implemented: items 2 (circuit breaker + `/stats`), 3 (parallel IMDb→TMDB + bounded cache), 4 (3-minute bounded stream cache with in-flight coalescing), 6 (Render keep-alive workflow), 9 (filter prototype fix), 14 (lint/audit/Dependabot/Node pin/CI-gated deploys), and 15 (graceful shutdown + preloaded configure page). Item 1 (soft deadline) and the remaining items are still open.
 
 ## Highest impact
 
@@ -18,7 +18,7 @@ Implemented: item 2 (circuit breaker + `/stats`), item 3 (parallel IMDb→TMDB +
 
 5. **Basic abuse protection** — `server.js:74` is a public endpoint where each request fans out 28 outbound scrapes. A per-IP token bucket + global concurrency cap prevents someone (or a bad client loop) from hammering upstream sites and getting the server IP banned.
 
-6. **Fix Render cold starts** — free tier sleeps after 15 min; a GitHub Actions cron (or UptimeRobot) hitting `/health` every 10 min keeps it warm and stays within the 750 free hours.
+6. **Fix Render cold starts** — done: `.github/workflows/keep-alive.yml` pings `/health` every 10 minutes. Because the repo is private, it runs four 5h50m jobs per day instead of a separate 10-minute cron, which would bill ~4,320 Actions minutes/month; the current shape uses ~1,400 of the 2,000 free minutes. UptimeRobot remains a zero-Actions-minute alternative.
 
 ## Medium
 
@@ -26,7 +26,7 @@ Implemented: item 2 (circuit breaker + `/stats`), item 3 (parallel IMDb→TMDB +
 
 8. **Sync workflow security** — `sync-upstream.yml` runs upstream provider code with a `contents: write` token. Split verification (read-only job) from the push job, use `npm ci --ignore-scripts`, and alert on failure (e.g., auto-open an issue) so sync doesn't silently stop updating.
 
-9. **Filter bug** — `filters.js:56`: `direct[quality]` hits `Object.prototype` (`quality: 'constructor'` returns a function). Use `Object.create(null)` + `hasOwn`.
+9. **Filter bug** — done: `filters.js` uses a null-prototype lookup with `Object.hasOwn`, so `constructor`/`__proto__` no longer hit `Object.prototype`; regression tests cover prototype keys.
 
 10. **User-facing polish** — `format.js:26`: `name` is only the provider name; include quality/size (e.g., `MoviesDrive · 1080p · 1.4 GB`) so the stream list is scannable. Synthesize `bingeGroup` per provider+show for better episode grouping. Add min-resolution, "exclude CAM/TS", and provider checkboxes to `/configure`.
 
@@ -38,14 +38,10 @@ Implemented: item 2 (circuit breaker + `/stats`), item 3 (parallel IMDb→TMDB +
 
 13. **More tests** — only filters/format are covered; add mock-provider tests for `collectStreams` (soft deadline, dedupe, timeout, circuit breaker) by injecting providers, plus route tests. Consider `node:test` over the hand-rolled runner.
 
-14. **CI additions** — ESLint, `npm audit`, Dependabot, Node version pin (`.nvmrc`), and gate Render deploys on CI (`Auto-Deploy → After CI Checks Pass`, already an open item).
+14. **CI additions** — done: ESLint 10 flat config (`npm run lint`), an `npm audit` gate that allowlists only the unfixable legacy `cheerio-without-node-native` chain, weekly Dependabot for npm and Actions, Node 22 pinned via `.nvmrc`, and `autoDeployTrigger: checksPass` in `render.yaml`. Note: `npm audit` alone cannot pass because the vendored `jsdom 7`/`request` tree has no fixed versions; `scripts/check-audit.js` fails on any new high/critical advisory.
 
-15. **Graceful shutdown** — handle `SIGTERM` with `server.close()` so Render redeploys don't kill in-flight requests; cache `configure.html` in memory instead of reading per request.
+15. **Graceful shutdown** — done: `SIGTERM`/`SIGINT` stop the listener, close idle keep-alives, drain in-flight requests for up to 25s (within Render's 30s budget), and exit; `configure.html` is loaded once at startup.
 
 ## Operational note
 
 Since the addon scrapes third-party sites, avoid proxying video through the server (bandwidth/liability) — `proxyHeaders` on the client is the right approach.
-
-## Suggested next
-
-Item 1 (soft deadline) is now the highest-impact remaining change; then rate limiting (item 5) and sync-workflow hardening (item 8).

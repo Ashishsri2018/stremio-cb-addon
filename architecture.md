@@ -48,7 +48,7 @@ Configured routes (settings encoded as base64url JSON in the path, no server-sid
 
 - Manifest: `/{config}/manifest.json`
 - Stream: `/{config}/stream/{movie|series}/{id}.json`
-- `GET /configure` serves the HTML builder that generates these URLs and a `stremio://` install link.
+- `GET /configure` serves the HTML builder that generates these URLs and a `stremio://` install link. The file is read once at startup and served from memory.
 - A path segment that does not decode to a JSON object returns `400 {"error":"Invalid configuration"}`; plain routes use permissive defaults.
 
 Stream object mapping (format.js):
@@ -83,9 +83,12 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 | `lib/timeout.js` | `TimeoutError` and promise timeout helper |
 | `configure.html` | Self-contained `/configure` page that builds the encoded manifest URL |
 | `scripts/verify.js` | Verifies every enabled provider module loads (used by CI and sync) |
+| `scripts/check-audit.js` | `npm audit` gate: fails on new high/critical advisories, allows the unfixable legacy `cheerio-without-node-native` chain |
 | `scripts/test-filters.js` | Unit tests for config, filters, and stream formatting (`npm test`) |
 | `scripts/test-runtime.js` | Unit tests for cache, breaker, timeout, metadata race, and collector integration (`npm test`) |
 | `vendor/cb-providers/` | Upstream GPL-3.0 snapshot: `providers/`, `manifest.json`, `LICENSE`, `UPSTREAM_COMMIT` |
+| `eslint.config.js` | Flat ESLint config for the addon sources (vendored providers excluded) |
+| `.nvmrc` | Node version pin (22) for CI and Render |
 | `render.yaml` | Render blueprint matching the live service |
 | `.github/workflows/` | CI and daily upstream sync |
 
@@ -107,6 +110,7 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 - Metadata: when `TMDB_API_KEY` is set, Cinemeta and TMDB are queried concurrently and the first non-null ID wins; the loser is not awaited. Both caches are bounded LRUs.
 - Streams: raw provider output is cached for 3 minutes, bounded and non-empty-only, shared across filter configs; concurrent identical requests share one provider fan-out.
 - Health stats reset on restart; the Render service is single-instance, so no cross-process coordination is needed.
+- On `SIGTERM`/`SIGINT` the server stops accepting connections, closes idle keep-alive sockets, and waits up to 25s for in-flight requests before exiting (Render's default shutdown budget is 30s).
 
 ## Configuration
 
@@ -146,10 +150,13 @@ Filters are encoded in the addon URL as base64url JSON and applied per request o
 - Render web service, free plan, Singapore: `https://stremio-cb-addon.onrender.com`
 - Build: `npm ci`; start: `node server.js`; health check: `/health`.
 - The live service stores a user-supplied `TMDB_API_KEY` as an encrypted Render env var (never committed). It is used only by the Cinemeta fallback resolver; provider-embedded TMDB keys are unaffected.
-- CI (`.github/workflows/ci.yml`): on push/PR, runs `npm ci`, syntax check (root + `lib/`), provider registry verification, unit tests (`npm test`: filters + runtime), and HTTP smoke tests including `/health`, `/stats`, `/configure`, and configured routes.
-- Sync (`.github/workflows/sync-upstream.yml`): daily at 03:17 UTC (also manual). It vendors the latest upstream providers, verifies the full provider set, and commits only when valid. The resulting commit triggers Render auto-deploy.
+- CI (`.github/workflows/ci.yml`): on push/PR, runs `npm ci`, ESLint (`npm run lint`), syntax check (root + `lib/`), provider registry verification, dependency audit gate (`scripts/check-audit.js`), unit tests (`npm test`: filters + runtime), and HTTP smoke tests including `/health`, `/stats`, `/configure`, and configured routes.
+- Node is pinned to 22 via `.nvmrc` for both CI and Render.
+- Sync (`.github/workflows/sync-upstream.yml`): daily at 03:17 UTC (also manual). It vendors the latest upstream providers, verifies the full provider set, and commits only when valid. The resulting commit triggers CI.
+- Keep-alive (`.github/workflows/keep-alive.yml`): four daily 5h50m jobs ping `/health` every 10 minutes so the free instance does not sleep; this shape costs ~1,400 Actions minutes/month instead of ~4,320 for a separate 10-minute cron.
 - Docs-only commits use `[skip ci]` (plus `[skip render]`) to avoid unnecessary builds.
-- Render auto-deploy is not gated on CI by default; enable "Auto-Deploy -> After CI Checks Pass" in the service settings if desired.
+- Render uses `autoDeployTrigger: checksPass`, so deploys start only after the CI checks for the commit pass.
+- The audit gate allowlists four GHSA advisories reachable only through `cheerio-without-node-native`'s vendored `jsdom 7`/`request` tree, which has no fix; any new high/critical advisory fails CI.
 
 ## Failure modes and constraints
 
