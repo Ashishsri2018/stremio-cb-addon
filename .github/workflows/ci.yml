@@ -20,7 +20,7 @@ jobs:
       - run: npm ci
 
       - name: Syntax check
-        run: for f in *.js; do node --check "$f"; done
+        run: for f in *.js lib/*.js; do node --check "$f"; done
 
       - name: Provider registry check
         run: npm run verify
@@ -37,6 +37,9 @@ jobs:
             curl -fsS http://127.0.0.1:7000/health >/dev/null && break
             sleep 1
           done
+          curl -fsS http://127.0.0.1:7000/health | grep -q 'uptimeSec'
+          curl -fsS http://127.0.0.1:7000/stats | grep -q '"circuits"'
+          curl -fsS http://127.0.0.1:7000/stats | grep -q '"streamCache"'
           curl -fsS http://127.0.0.1:7000/manifest.json | grep -q 'community.cb-providers'
           curl -fsS http://127.0.0.1:7000/manifest.json | grep -q 'configurable'
           curl -fsS http://127.0.0.1:7000/configure | grep -q 'Max resolution'

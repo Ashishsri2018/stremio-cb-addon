@@ -1,73 +1,181 @@
 const config = require('./config');
-const { providersFor } = require('./providers');
-const { resolveTmdbId } = require('./cinemeta');
+const { getRegistry, providersFor } = require('./providers');
+const cinemeta = require('./cinemeta');
 const { qualityRank, toStremioStream } = require('./format');
 const { DEFAULT_CONFIG, streamPassesFilters } = require('./filters');
+const { createBreaker } = require('./lib/breaker');
+const { createStreamCache } = require('./lib/stream-cache');
+const { TimeoutError, withTimeout } = require('./lib/timeout');
 
-function withTimeout(promise, ms, label) {
-  let timer;
-  const timeout = new Promise((resolve) => {
-    timer = setTimeout(() => {
-      console.warn(`[streams] ${label} timed out after ${ms}ms`);
-      resolve([]);
-    }, ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+function streamKey(type, imdbId, season, episode) {
+  return `${type}:${imdbId}:${season ?? ''}:${episode ?? ''}`;
 }
 
-async function collectStreams(imdbId, type, season, episode, userConfig = DEFAULT_CONFIG) {
-  const deadline = Date.now() + config.deadlineMs;
-  const mediaType = type === 'series' ? 'tv' : 'movie';
-  const tmdbId = await resolveTmdbId(imdbId, type);
-  if (!tmdbId) {
-    console.warn(`[streams] no TMDB id resolved for ${imdbId}`);
-    return [];
-  }
-
-  const timeoutMs = Math.max(1000, Math.min(config.providerTimeoutMs, deadline - Date.now()));
-  const providers = providersFor(mediaType);
-  const results = await Promise.all(
-    providers.map(async (provider) => {
-      const started = Date.now();
-      try {
-        const streams = await withTimeout(
-          Promise.resolve().then(() => provider.getStreams(String(tmdbId), mediaType, season, episode)),
-          timeoutMs,
-          provider.id
-        );
-        const list = Array.isArray(streams) ? streams : [];
-        if (list.length > 0) {
-          console.log(`[streams] ${provider.id} -> ${list.length} (${Date.now() - started}ms)`);
-        }
-        return list
-          .filter(
-            (stream) =>
-              stream &&
-              ((typeof stream.url === 'string' && stream.url.length > 0) ||
-                (typeof stream.infoHash === 'string' && stream.infoHash.length > 0))
-          )
-          .map((stream) => ({ stream, provider }));
-      } catch (err) {
-        console.warn(`[streams] ${provider.id} failed: ${err.message}`);
-        return [];
-      }
-    })
+function validStream(stream) {
+  return (
+    stream &&
+    ((typeof stream.url === 'string' && stream.url.length > 0) ||
+      (typeof stream.infoHash === 'string' && stream.infoHash.length > 0))
   );
+}
 
+function dedupe(results) {
   const seen = new Set();
   const deduped = [];
+
   for (const list of results) {
     for (const item of list) {
       const key = item.stream.url || `${item.stream.infoHash}:${item.stream.fileIdx || 0}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      deduped.push({ ...item, rank: qualityRank(item.stream) });
+      deduped.push(item);
     }
   }
 
-  const filtered = deduped.filter((item) => streamPassesFilters(item.stream, userConfig));
-  filtered.sort((a, b) => a.rank - b.rank || a.provider.order - b.provider.order);
-  return filtered.map((item) => toStremioStream(item.stream, item.provider)).filter(Boolean);
+  return deduped;
 }
 
-module.exports = { collectStreams };
+function createCollector({
+  providersFor: providersForFn = providersFor,
+  getProviders = getRegistry,
+  resolveTmdbId = cinemeta.resolveTmdbId,
+  getMetadataCacheStats = cinemeta.cacheStats,
+  breaker = createBreaker({
+    threshold: config.breakerFailureThreshold,
+    cooldownMs: config.breakerCooldownMs,
+  }),
+  cache = createStreamCache({
+    ttlMs: config.streamCacheTtlMs,
+    maxEntries: config.streamCacheMaxEntries,
+  }),
+  providerTimeoutMs = config.providerTimeoutMs,
+  deadlineMs = config.deadlineMs,
+  minProviderTimeoutMs = 1000,
+  now = Date.now,
+  logger = console,
+} = {}) {
+  async function runProviders(imdbId, type, season, episode) {
+    const deadline = now() + deadlineMs;
+    const mediaType = type === 'series' ? 'tv' : 'movie';
+    const tmdbId = await resolveTmdbId(imdbId, type);
+    if (!tmdbId) {
+      logger.warn(`[streams] no TMDB id resolved for ${imdbId}`);
+      return [];
+    }
+
+    const timeoutMs = Math.max(
+      minProviderTimeoutMs,
+      Math.min(providerTimeoutMs, deadline - now())
+    );
+    const providers = providersForFn(mediaType);
+    const results = await Promise.all(
+      providers.map(async (provider) => {
+        if (!breaker.attempt(provider.id)) return [];
+
+        const started = now();
+        try {
+          const streams = await withTimeout(
+            Promise.resolve().then(() =>
+              provider.getStreams(String(tmdbId), mediaType, season, episode)
+            ),
+            timeoutMs,
+            provider.id
+          );
+          const list = (Array.isArray(streams) ? streams : [])
+            .filter(validStream)
+            .map((stream) => ({ stream, provider }));
+          breaker.record(provider.id, list.length > 0 ? 'ok' : 'empty', {
+            latencyMs: now() - started,
+          });
+          if (list.length > 0) {
+            logger.log(`[streams] ${provider.id} -> ${list.length} (${now() - started}ms)`);
+          }
+          return list;
+        } catch (err) {
+          const outcome = err instanceof TimeoutError ? 'timeout' : 'error';
+          breaker.record(provider.id, outcome, {
+            latencyMs: now() - started,
+            error: err,
+          });
+          if (outcome === 'timeout') {
+            logger.warn(`[streams] ${provider.id} timed out after ${timeoutMs}ms`);
+          } else {
+            logger.warn(`[streams] ${provider.id} failed: ${err.message}`);
+          }
+          return [];
+        }
+      })
+    );
+
+    return dedupe(results);
+  }
+
+  async function collectStreams(imdbId, type, season, episode, userConfig = DEFAULT_CONFIG) {
+    const key = streamKey(type, imdbId, season, episode);
+    const raw = await cache.getOrLoad(key, () =>
+      runProviders(imdbId, type, season, episode)
+    );
+
+    const filtered = raw
+      .map((item) => ({ ...item, rank: qualityRank(item.stream) }))
+      .filter((item) => streamPassesFilters(item.stream, userConfig));
+
+    filtered.sort((a, b) => {
+      const byQuality = a.rank - b.rank;
+      if (byQuality !== 0) return byQuality;
+      const byHealth = breaker.score(b.provider.id) - breaker.score(a.provider.id);
+      if (byHealth !== 0) return byHealth;
+      return a.provider.order - b.provider.order;
+    });
+
+    return filtered
+      .map((item) => toStremioStream(item.stream, item.provider))
+      .filter(Boolean);
+  }
+
+  function getRuntimeStats() {
+    const registry = getProviders();
+    const seen = new Map(breaker.snapshot().map((entry) => [entry.id, entry]));
+    const providers = registry.map((provider) => {
+      const entry = seen.get(provider.id);
+      if (entry) return { name: provider.name, ...entry };
+      return {
+        id: provider.id,
+        name: provider.name,
+        state: 'closed',
+        calls: 0,
+        ok: 0,
+        empty: 0,
+        errors: 0,
+        timeouts: 0,
+        skipped: 0,
+        consecutiveFailures: 0,
+        lastMs: null,
+        avgMs: null,
+        maxMs: 0,
+        score: 0.5,
+        lastError: null,
+        lastSuccessAt: null,
+        openedAt: null,
+      };
+    });
+
+    return {
+      circuits: breaker.summary(registry.map((provider) => provider.id)),
+      providers,
+      streamCache: cache.stats(),
+      metadataCache:
+        typeof getMetadataCacheStats === 'function' ? getMetadataCacheStats() : null,
+    };
+  }
+
+  return { collectStreams, getRuntimeStats };
+}
+
+const defaultCollector = createCollector();
+
+module.exports = {
+  createCollector,
+  collectStreams: defaultCollector.collectStreams,
+  getRuntimeStats: defaultCollector.getRuntimeStats,
+};

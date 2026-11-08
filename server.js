@@ -3,11 +3,12 @@ const fs = require('fs');
 const path = require('path');
 const config = require('./config');
 const { getRegistry } = require('./providers');
-const { collectStreams } = require('./streams');
+const { collectStreams, getRuntimeStats } = require('./streams');
 const { DEFAULT_CONFIG, decodeConfig } = require('./filters');
 
 const logoPath = path.join(__dirname, 'logo.png');
 const configurePath = path.join(__dirname, 'configure.html');
+const startedAt = Date.now();
 const streamRoute = /^\/stream\/(movie|series)\/([^/]+)\.json$/;
 const configManifestRoute = /^\/([A-Za-z0-9_-]{1,512})\/manifest\.json$/;
 const configStreamRoute = /^\/([A-Za-z0-9_-]{1,512})\/stream\/(movie|series)\/([^/]+)\.json$/;
@@ -26,6 +27,10 @@ function baseUrl(req) {
   const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
   const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${config.port}`;
   return `${proto}://${host}`;
+}
+
+function uptimeSeconds() {
+  return Math.floor((Date.now() - startedAt) / 1000);
 }
 
 function manifestFor(req) {
@@ -132,7 +137,25 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/health') {
-    sendJson(res, 200, { ok: true, providers: getRegistry().length });
+    const runtime = getRuntimeStats();
+    sendJson(res, 200, {
+      ok: true,
+      providers: getRegistry().length,
+      uptimeSec: uptimeSeconds(),
+      circuits: { open: runtime.circuits.open, halfOpen: runtime.circuits.halfOpen },
+      cacheEntries: runtime.streamCache.size,
+    });
+    return;
+  }
+
+  if (pathname === '/stats') {
+    const runtime = getRuntimeStats();
+    sendJson(res, 200, {
+      ok: true,
+      startedAt: new Date(startedAt).toISOString(),
+      uptimeSec: uptimeSeconds(),
+      ...runtime,
+    });
     return;
   }
 

@@ -9,13 +9,16 @@ Stremio client
   |  GET /stream/{movie|series}/{imdb-id}.json
   v
 server.js (Node >=18, Render)
-  |-- cinemeta.js   IMDb ID -> TMDB ID (Cinemeta, 24h cache; optional TMDB API fallback)
+  |-- cinemeta.js   IMDb ID -> TMDB ID (Cinemeta and TMDB raced, bounded LRU, 24h/60s TTL)
   |-- providers.js  loads vendor/cb-providers/manifest.json, filters by media type
   |-- streams.js    runs providers in parallel (20s each, 25s overall deadline)
+  |     |-- lib/breaker.js: per-provider circuit breaker (3 failures -> 5 min open)
+  |     |-- lib/stream-cache.js: 3 min raw result cache, bounded, coalesces requests
   |     |-- provider.getStreams(tmdbId, movie|tv, season, episode)
   |     |-- dedupe by URL, then filters.js: user resolution/size/subtitle filters
   |     |-- format.js: normalize to Stremio streams (subtitles, videoSize, proxyHeaders, notWebReady, bingeGroup)
-  |     `-- sort by quality rank
+  |     `-- sort by quality rank, then provider health, then manifest order
+  |-- /stats and /health: circuit, cache, and uptime telemetry
   v
 { "streams": [ ... ] }
 ```
@@ -37,7 +40,8 @@ Stream routes:
 - Series episode: `/stream/series/tt0944947:1:1.json` (`id = imdbId:season:episode`)
 - Series without season/episode returns `200 {"streams":[]}` because providers require an episode.
 - Invalid IMDb ID returns `400`; unknown routes return `404`; unexpected failures return `500`.
-- `GET /health` returns `{ ok: true, providers: <loaded count> }`.
+- `GET /health` returns `{ ok, providers, uptimeSec, circuits: { open, halfOpen }, cacheEntries }` (cheap; used by Render).
+- `GET /stats` returns detailed in-memory telemetry: per-provider circuit state and counters, stream cache stats, and metadata cache stats.
 - `GET /logo.png` serves the addon logo used by `/manifest.json`.
 
 Configured routes (settings encoded as base64url JSON in the path, no server-side state):
@@ -58,7 +62,9 @@ Stream object mapping (format.js):
 - Provider `subtitles` tracks are normalized to Stremio subtitle objects (`{id,url,lang}`) from `url`/`file`/`src` and `lang`/`language`/`label`.
 - Provider `size` or size text in the title becomes `behaviorHints.videoSize`.
 
-Stream results are never cached: many provider URLs are time-signed and expire.
+Results are ordered by quality rank, then provider health (Laplace-smoothed `ok/calls`), then manifest order.
+
+Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) keyed by `type:imdbId:season:episode`, before user filters and formatting, so one entry serves every filter configuration. The cache is bounded (`STREAM_CACHE_MAX_ENTRIES`), stores only non-empty results, and coalesces concurrent identical requests. URLs are time-signed, so the TTL stays short and can be disabled with `0`.
 
 ## Components
 
@@ -71,9 +77,14 @@ Stream results are never cached: many provider URLs are time-signed and expire.
 | `streams.js` | Provider orchestration, timeouts, dedupe, filtering, quality sorting |
 | `filters.js` | URL config encoding/decoding, resolution/size detection, subtitle normalization, stream filtering |
 | `format.js` | Provider stream -> Stremio stream conversion |
+| `lib/lru.js` | Bounded TTL/LRU cache used by metadata and stream caches |
+| `lib/breaker.js` | Per-provider circuit breaker and health counters |
+| `lib/stream-cache.js` | 3-minute raw stream cache with in-flight coalescing |
+| `lib/timeout.js` | `TimeoutError` and promise timeout helper |
 | `configure.html` | Self-contained `/configure` page that builds the encoded manifest URL |
 | `scripts/verify.js` | Verifies every enabled provider module loads (used by CI and sync) |
 | `scripts/test-filters.js` | Unit tests for config, filters, and stream formatting (`npm test`) |
+| `scripts/test-runtime.js` | Unit tests for cache, breaker, timeout, metadata race, and collector integration (`npm test`) |
 | `vendor/cb-providers/` | Upstream GPL-3.0 snapshot: `providers/`, `manifest.json`, `LICENSE`, `UPSTREAM_COMMIT` |
 | `render.yaml` | Render blueprint matching the live service |
 | `.github/workflows/` | CI and daily upstream sync |
@@ -84,9 +95,18 @@ Stream results are never cached: many provider URLs are time-signed and expire.
 - Vendored, not used as a submodule, so Render needs no submodule support.
 - `manifest.json` fields used: `id`, `name`, `filename`, `enabled`, `supportedTypes`.
 - Provider modules export `getStreams(tmdbId, mediaType, season, episode)` where `mediaType` is `movie` or `tv`.
+- Outcomes per call: non-empty valid array = `ok`, empty = `empty` (legitimate no-match), thrown error = `error`, timeout = `timeout`. Only errors and timeouts count toward the breaker.
 - Type mapping: a movie request loads providers supporting `movie`; a series request loads providers supporting `tv` or `anime`.
 - Runtime dependencies required by provider bundles: `cheerio`, `cheerio-without-node-native`, `axios`, `crypto-js`.
 - `scripts/verify.js` fails if any enabled provider cannot be loaded; the sync workflow runs it before committing new upstream code.
+
+## Runtime resilience
+
+- Provider circuits are in-memory and per-process: 3 consecutive timeouts/errors open one for 5 minutes; after cooldown a single half-open probe decides whether to close it. Empty results reset the failure streak.
+- `/stats` exposes per-provider counters, latency, last error, and state. `/health` stays cheap for Render.
+- Metadata: when `TMDB_API_KEY` is set, Cinemeta and TMDB are queried concurrently and the first non-null ID wins; the loser is not awaited. Both caches are bounded LRUs.
+- Streams: raw provider output is cached for 3 minutes, bounded and non-empty-only, shared across filter configs; concurrent identical requests share one provider fan-out.
+- Health stats reset on restart; the Render service is single-instance, so no cross-process coordination is needed.
 
 ## Configuration
 
@@ -101,7 +121,12 @@ Stream results are never cached: many provider URLs are time-signed and expire.
 | `ADDON_DEADLINE_MS` | `25000` | Overall time budget per stream request |
 | `PROVIDERS` | all enabled | Comma-separated provider allowlist |
 | `CINEMETA_URL` | `https://v3-cinemeta.strem.io` | Metadata resolver base URL |
-| `TMDB_API_KEY` | empty | Optional fallback when Cinemeta lacks `moviedb_id` |
+| `TMDB_API_KEY` | empty | Enables the TMDB resolver, raced in parallel with Cinemeta |
+| `BREAKER_FAILURE_THRESHOLD` | `3` | Consecutive timeouts/errors before a provider circuit opens |
+| `BREAKER_COOLDOWN_MS` | `300000` | Open-circuit cooldown before a single half-open probe |
+| `STREAM_CACHE_TTL_MS` | `180000` | Raw stream cache TTL; `0` disables storage |
+| `STREAM_CACHE_MAX_ENTRIES` | `500` | Raw stream cache entry cap |
+| `TMDB_CACHE_MAX_ENTRIES` | `5000` | IMDb→TMDB resolution cache cap |
 
 ## User filters
 
@@ -121,7 +146,7 @@ Filters are encoded in the addon URL as base64url JSON and applied per request o
 - Render web service, free plan, Singapore: `https://stremio-cb-addon.onrender.com`
 - Build: `npm ci`; start: `node server.js`; health check: `/health`.
 - The live service stores a user-supplied `TMDB_API_KEY` as an encrypted Render env var (never committed). It is used only by the Cinemeta fallback resolver; provider-embedded TMDB keys are unaffected.
-- CI (`.github/workflows/ci.yml`): on push/PR, runs `npm ci`, syntax check, provider registry verification, filter unit tests (`npm test`), and HTTP smoke tests including `/configure` and configured routes.
+- CI (`.github/workflows/ci.yml`): on push/PR, runs `npm ci`, syntax check (root + `lib/`), provider registry verification, unit tests (`npm test`: filters + runtime), and HTTP smoke tests including `/health`, `/stats`, `/configure`, and configured routes.
 - Sync (`.github/workflows/sync-upstream.yml`): daily at 03:17 UTC (also manual). It vendors the latest upstream providers, verifies the full provider set, and commits only when valid. The resulting commit triggers Render auto-deploy.
 - Docs-only commits use `[skip ci]` (plus `[skip render]`) to avoid unnecessary builds.
 - Render auto-deploy is not gated on CI by default; enable "Auto-Deploy -> After CI Checks Pass" in the service settings if desired.
@@ -129,8 +154,9 @@ Filters are encoded in the addon URL as base64url JSON and applied per request o
 ## Failure modes and constraints
 
 - **Render free tier sleeps after 15 minutes idle.** The first request afterward cold-starts and may exceed Stremio's request timeout.
-- **Datacenter IP blocking.** Some upstream sites reject cloud IPs, so fewer providers respond on Render than locally.
-- **Signed URLs expire.** Streams are resolved on demand and not persisted; response times are bounded by the 20s/25s timeouts.
+- **Datacenter IP blocking.** Some upstream sites reject cloud IPs. The breaker catches timeouts/throws, but most providers swallow blocked responses and return empty, so `/stats` empty counts are the signal; fewer providers respond on Render than locally.
+- **Signed URLs expire.** Raw results are cached for at most 3 minutes; responses are otherwise bounded by the 20s/25s timeouts.
+- **All circuits open.** A request can return no new streams until a cooldown probe succeeds; cached entries still serve if present.
 - **Filtering is opt-in.** Plain routes only sort by quality; configured routes apply resolution/size/subtitle filters. Metadata is provider-supplied, so unknown values are controlled by `keepUnknown`.
 - **Upstream drift.** A new provider may require a new npm dependency; the sync workflow's verification fails before committing in that case, so the fix is to add the dependency and re-run the sync.
 

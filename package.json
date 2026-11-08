@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node scripts/test-filters.js",
+    "test": "node scripts/test-filters.js && node scripts/test-runtime.js",
     "verify": "node scripts/verify.js"
   },
   "engines": {

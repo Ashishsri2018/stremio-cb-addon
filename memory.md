@@ -18,8 +18,20 @@ Conventions:
 - Verified live: `/health` shows 28 providers; `tt0137523` returned 66 streams from 12 providers (70 streams / 16 providers locally)
 - Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
 - TMDB fallback: user-supplied key stored as a Render secret (not in git); providers still use their embedded keys
+- Runtime resilience: per-provider circuit breaker + `/stats`; Cinemeta/TMDB raced in parallel; raw stream results cached 3 min
 
 ## Log
+
+### 2026-11-08 - Circuit breaker, parallel metadata, stream cache
+
+- Added `lib/breaker.js`, `lib/stream-cache.js`, `lib/lru.js`, and `lib/timeout.js`.
+- Provider outcomes are classified as `ok`, `empty`, `timeout`, or `error`. Three consecutive timeouts/errors open a circuit for 5 minutes; one half-open probe is allowed after cooldown. Empty results reset the streak and never count as failures.
+- Added `GET /stats` with per-provider counters/state, stream cache stats, and metadata cache stats. `/health` now includes uptime, open circuits, and cache entries.
+- IMDb→TMDB resolution races Cinemeta and TMDB when `TMDB_API_KEY` is set; the first non-null ID wins and the loser is not awaited. Both caches are bounded LRUs (24h positive / 60s negative).
+- Raw provider results are cached for 3 minutes before filters/formatting, bounded to 500 entries, non-empty only, with in-flight coalescing. Filters still run per request.
+- Stream ordering is quality rank, then Laplace-smoothed provider health, then manifest order.
+- New env vars: `BREAKER_FAILURE_THRESHOLD=3`, `BREAKER_COOLDOWN_MS=300000`, `STREAM_CACHE_TTL_MS=180000`, `STREAM_CACHE_MAX_ENTRIES=500`, `TMDB_CACHE_MAX_ENTRIES=5000`.
+- Verification: `npm test` passes (9 filter + 26 runtime checks); `npm run verify` loads 28/28; a mock-provider E2E confirmed cache hits on repeat requests, circuit open after 3 errors, and skip-without-invocation on the 4th request.
 
 ### 2026-11-08 - Credential audit and TMDB fallback key
 
@@ -71,6 +83,7 @@ Conventions:
 
 ## Open items
 
+- Implement a soft deadline (~10s) that returns partial results instead of waiting for the full 25s deadline.
 - Provider-level optional settings (Torrentio Debrid key, Einthusan premium login/language toggles) are not exposed by this Stremio addon; providers read them from `globalThis.SCRAPER_SETTINGS`, which is never set.
 - Add a min-resolution floor if requested (the current resolution filter is a ceiling).
 - Consider enabling Render "Auto-Deploy -> After CI Checks Pass" to gate deploys on CI.
