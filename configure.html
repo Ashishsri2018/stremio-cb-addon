@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CB Providers - Configure</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(circle at top, #1d2433 0%, #0d1119 55%, #080a0f 100%);
+    color: #e8edf6;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+  main { width: 100%; max-width: 620px; }
+  h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; }
+  .sub { margin: 0 0 28px; color: #93a0b8; font-size: 15px; line-height: 1.5; }
+  .card {
+    background: #121826;
+    border: 1px solid #232d42;
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+  }
+  .field { margin-bottom: 20px; }
+  .field:last-of-type { margin-bottom: 24px; }
+  label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 7px; }
+  .hint { display: block; font-weight: 400; color: #8491a8; font-size: 12px; margin-top: 4px; }
+  select, input[type="number"], input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 9px;
+    border: 1px solid #2b3750;
+    background: #0c111c;
+    color: #e8edf6;
+    font-size: 14px;
+    outline: none;
+  }
+  select:focus, input:focus { border-color: #4f7cff; }
+  .check { display: flex; gap: 10px; align-items: flex-start; }
+  .check input { width: 17px; height: 17px; margin-top: 2px; accent-color: #4f7cff; }
+  .check label { margin: 0; font-weight: 500; }
+  .result { margin-top: 4px; }
+  .url-row { display: flex; gap: 8px; }
+  .url-row input { font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  button, .install {
+    display: inline-block;
+    border: 0;
+    border-radius: 9px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  button { background: #263247; color: #dfe6f3; }
+  button:hover { background: #313f59; }
+  .install { background: #4f7cff; color: #fff; margin-top: 12px; }
+  .install:hover { background: #628cff; }
+  #status { color: #6fd08c; font-size: 13px; margin-left: 10px; }
+  .note { color: #8491a8; font-size: 12px; line-height: 1.55; margin: 22px 0 0; }
+  code { color: #b8c4d8; }
+</style>
+</head>
+<body>
+<main>
+  <h1>CB Providers</h1>
+  <p class="sub">Build your personal manifest URL. Filters apply when Stremio requests streams; the settings are encoded in the URL, so no account is needed.</p>
+
+  <div class="card">
+    <form id="config-form">
+      <div class="field">
+        <label for="maxRes">Max resolution</label>
+        <select id="maxRes">
+          <option value="any">No limit</option>
+          <option value="2160">4K (2160p)</option>
+          <option value="1080">1080p</option>
+          <option value="720">720p</option>
+          <option value="480">480p</option>
+        </select>
+        <span class="hint">Hides streams above the selected resolution.</span>
+      </div>
+
+      <div class="field">
+        <label for="maxSize">Max file size (GB)</label>
+        <input id="maxSize" type="number" min="0" step="0.1" inputmode="decimal" placeholder="No limit">
+        <span class="hint">Leave empty for no limit. Adaptive HLS streams usually have no size.</span>
+      </div>
+
+      <div class="field">
+        <label for="subtitles">Subtitles</label>
+        <select id="subtitles">
+          <option value="any">Any</option>
+          <option value="required">Require subtitles</option>
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="ta">Tamil</option>
+          <option value="te">Telugu</option>
+          <option value="ml">Malayalam</option>
+          <option value="ja">Japanese</option>
+          <option value="multi">Multi</option>
+        </select>
+        <span class="hint">Uses provider subtitle tracks and filename hints when available.</span>
+      </div>
+
+      <div class="field check">
+        <input id="keepUnknown" type="checkbox" checked>
+        <label for="keepUnknown">Keep streams with unknown metadata
+          <span class="hint">Applies to unknown size, resolution, or subtitle information.</span>
+        </label>
+      </div>
+    </form>
+
+    <div class="result">
+      <label for="url">Manifest URL</label>
+      <div class="url-row">
+        <input id="url" type="text" readonly>
+        <button id="copy" type="button">Copy</button>
+      </div>
+      <a id="install" class="install" href="#">Install in Stremio</a>
+      <span id="status"></span>
+      <p class="note">The URL contains your settings. Install it in Stremio via the button, or paste the manifest URL into Stremio's addon search. Removing the addon and installing a new URL is the easiest way to change filters later.</p>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  var form = document.getElementById('config-form');
+  var urlInput = document.getElementById('url');
+  var installLink = document.getElementById('install');
+  var copyButton = document.getElementById('copy');
+  var status = document.getElementById('status');
+
+  function base64Url(text) {
+    var bytes = new TextEncoder().encode(text);
+    var binary = '';
+    for (var i = 0; i < bytes.length; i += 1) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function readConfig() {
+    var sizeValue = document.getElementById('maxSize').value.trim();
+    var size = sizeValue === '' ? null : Number(sizeValue);
+    return {
+      maxRes: document.getElementById('maxRes').value,
+      maxSizeGB: Number.isFinite(size) && size > 0 ? size : null,
+      keepUnknown: document.getElementById('keepUnknown').checked,
+      subtitles: document.getElementById('subtitles').value
+    };
+  }
+
+  function refresh() {
+    var encoded = base64Url(JSON.stringify(readConfig()));
+    var manifestUrl = location.origin + '/' + encoded + '/manifest.json';
+    urlInput.value = manifestUrl;
+    installLink.href = 'stremio://' + manifestUrl.replace(/^https?:\/\//, '');
+  }
+
+  form.addEventListener('input', refresh);
+  form.addEventListener('change', refresh);
+
+  copyButton.addEventListener('click', function () {
+    var done = function () {
+      status.textContent = 'Copied';
+      setTimeout(function () { status.textContent = ''; }, 1800);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(urlInput.value).then(done, function () {
+        urlInput.select();
+        document.execCommand('copy');
+        done();
+      });
+    } else {
+      urlInput.select();
+      document.execCommand('copy');
+      done();
+    }
+  });
+
+  refresh();
+})();
+</script>
+</body>
+</html>

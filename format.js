@@ -1,3 +1,5 @@
+const { normalizeSubtitles, sizeBytesOf } = require('./filters');
+
 const QUALITY_PATTERNS = [
   [/\b(4k|uhd|2160p?)\b/i, 0],
   [/\b1080p?\b/i, 1],
@@ -33,7 +35,12 @@ function toStremioStream(stream, provider) {
     if (stream.fileIdx != null) out.fileIdx = stream.fileIdx;
   }
 
+  const subtitles = normalizeSubtitles(stream.subtitles);
+  if (subtitles.length > 0) out.subtitles = subtitles;
+
   const hints = {};
+  const videoSize = sizeBytesOf(stream);
+  if (videoSize != null) hints.videoSize = videoSize;
   if (stream.headers && typeof stream.headers === 'object' && Object.keys(stream.headers).length > 0) {
     hints.proxyHeaders = { request: stream.headers };
     hints.notWebReady = true;

@@ -2,6 +2,7 @@ const config = require('./config');
 const { providersFor } = require('./providers');
 const { resolveTmdbId } = require('./cinemeta');
 const { qualityRank, toStremioStream } = require('./format');
+const { DEFAULT_CONFIG, streamPassesFilters } = require('./filters');
 
 function withTimeout(promise, ms, label) {
   let timer;
@@ -14,7 +15,7 @@ function withTimeout(promise, ms, label) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-async function collectStreams(imdbId, type, season, episode) {
+async function collectStreams(imdbId, type, season, episode, userConfig = DEFAULT_CONFIG) {
   const deadline = Date.now() + config.deadlineMs;
   const mediaType = type === 'series' ? 'tv' : 'movie';
   const tmdbId = await resolveTmdbId(imdbId, type);
@@ -39,8 +40,12 @@ async function collectStreams(imdbId, type, season, episode) {
           console.log(`[streams] ${provider.id} -> ${list.length} (${Date.now() - started}ms)`);
         }
         return list
-          .map((stream) => toStremioStream(stream, provider))
-          .filter(Boolean)
+          .filter(
+            (stream) =>
+              stream &&
+              ((typeof stream.url === 'string' && stream.url.length > 0) ||
+                (typeof stream.infoHash === 'string' && stream.infoHash.length > 0))
+          )
           .map((stream) => ({ stream, provider }));
       } catch (err) {
         console.warn(`[streams] ${provider.id} failed: ${err.message}`);
@@ -60,8 +65,9 @@ async function collectStreams(imdbId, type, season, episode) {
     }
   }
 
-  deduped.sort((a, b) => a.rank - b.rank || a.provider.order - b.provider.order);
-  return deduped.map((item) => item.stream);
+  const filtered = deduped.filter((item) => streamPassesFilters(item.stream, userConfig));
+  filtered.sort((a, b) => a.rank - b.rank || a.provider.order - b.provider.order);
+  return filtered.map((item) => toStremioStream(item.stream, item.provider)).filter(Boolean);
 }
 
 module.exports = { collectStreams };

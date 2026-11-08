@@ -4,9 +4,13 @@ const path = require('path');
 const config = require('./config');
 const { getRegistry } = require('./providers');
 const { collectStreams } = require('./streams');
+const { DEFAULT_CONFIG, decodeConfig } = require('./filters');
 
 const logoPath = path.join(__dirname, 'logo.png');
+const configurePath = path.join(__dirname, 'configure.html');
 const streamRoute = /^\/stream\/(movie|series)\/([^/]+)\.json$/;
+const configManifestRoute = /^\/([A-Za-z0-9_-]{1,512})\/manifest\.json$/;
+const configStreamRoute = /^\/([A-Za-z0-9_-]{1,512})\/stream\/(movie|series)\/([^/]+)\.json$/;
 const imdbPattern = /^(tt\d+)(?::(\d+):(\d+))?$/;
 
 function sendJson(res, status, body, cacheControl = 'no-store') {
@@ -30,13 +34,41 @@ function manifestFor(req) {
     version: '1.0.0',
     name: config.addonName,
     description:
-      'Multi-provider stream addon powered by the CB Providers fleet (MoviesDrive, 4KHDHub, HDHub4u, VegaMovies, NetMirror, Torrentio, anime providers and more). Resolves content from IMDb IDs.',
+      'Multi-provider stream addon powered by the CB Providers fleet (MoviesDrive, 4KHDHub, HDHub4u, VegaMovies, NetMirror, Torrentio, anime providers and more). Resolves content from IMDb IDs. Configure resolution, size, and subtitle filters at /configure.',
     logo: `${baseUrl(req)}/logo.png`,
     types: ['movie', 'series'],
     resources: ['stream'],
     idPrefixes: ['tt'],
     catalogs: [],
+    behaviorHints: { configurable: true },
   };
+}
+
+function resolveRoute(pathname) {
+  if (pathname === '/manifest.json') {
+    return { kind: 'manifest', config: DEFAULT_CONFIG };
+  }
+
+  let match = streamRoute.exec(pathname);
+  if (match) {
+    return { kind: 'stream', type: match[1], rawId: match[2], config: DEFAULT_CONFIG };
+  }
+
+  match = configManifestRoute.exec(pathname);
+  if (match) {
+    const config = decodeConfig(match[1]);
+    return config ? { kind: 'manifest', config } : { kind: 'invalid-config' };
+  }
+
+  match = configStreamRoute.exec(pathname);
+  if (match) {
+    const config = decodeConfig(match[1]);
+    return config
+      ? { kind: 'stream', type: match[2], rawId: match[3], config }
+      : { kind: 'invalid-config' };
+  }
+
+  return null;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -62,13 +94,24 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       addon: config.addonName,
       manifest: `${baseUrl(req)}/manifest.json`,
+      configure: `${baseUrl(req)}/configure`,
       example: `${baseUrl(req)}/stream/movie/tt0137523.json`,
     });
     return;
   }
 
-  if (pathname === '/manifest.json') {
-    sendJson(res, 200, manifestFor(req), 'public, max-age=300');
+  if (pathname === '/configure') {
+    fs.readFile(configurePath, (err, data) => {
+      if (err) {
+        sendJson(res, 500, { error: 'Configure page unavailable' });
+        return;
+      }
+      res.writeHead(200, {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'public, max-age=300',
+      });
+      res.end(data);
+    });
     return;
   }
 
@@ -93,16 +136,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const route = streamRoute.exec(pathname);
+  const route = resolveRoute(pathname);
   if (!route) {
     sendJson(res, 404, { error: 'Not found' });
     return;
   }
+  if (route.kind === 'invalid-config') {
+    sendJson(res, 400, { error: 'Invalid configuration' });
+    return;
+  }
+  if (route.kind === 'manifest') {
+    sendJson(res, 200, manifestFor(req), 'public, max-age=300');
+    return;
+  }
 
-  const type = route[1];
+  const { type, config: userConfig } = route;
   let rawId;
   try {
-    rawId = decodeURIComponent(route[2]);
+    rawId = decodeURIComponent(route.rawId);
   } catch {
     sendJson(res, 400, { error: 'Invalid id encoding' });
     return;
@@ -124,9 +175,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    const streams = await collectStreams(imdbId, type, season, episode);
+    const streams = await collectStreams(imdbId, type, season, episode, userConfig);
     const label = season === null ? imdbId : `${imdbId} S${season}E${episode}`;
-    console.log(`[server] ${type} ${label} -> ${streams.length} streams (${Date.now() - started}ms)`);
+    console.log(
+      `[server] ${type} ${label} -> ${streams.length} streams (${Date.now() - started}ms)`
+    );
     sendJson(res, 200, { streams });
   } catch (err) {
     console.error(`[server] ${type} ${imdbId}: ${err.stack || err.message}`);

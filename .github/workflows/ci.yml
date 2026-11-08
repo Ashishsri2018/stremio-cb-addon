@@ -25,6 +25,9 @@ jobs:
       - name: Provider registry check
         run: npm run verify
 
+      - name: Filter tests
+        run: npm test
+
       - name: Addon smoke test
         run: |
           PROVIDERS=netmirror node server.js &
@@ -35,6 +38,12 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:7000/manifest.json | grep -q 'community.cb-providers'
+          curl -fsS http://127.0.0.1:7000/manifest.json | grep -q 'configurable'
+          curl -fsS http://127.0.0.1:7000/configure | grep -q 'Max resolution'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7000/stream/movie/not-an-id.json)" = "400"
           curl -fsS http://127.0.0.1:7000/stream/series/tt0944947.json | grep -q '"streams":\[\]'
+          CFG=$(node -e "console.log(require('./filters').encodeConfig({maxRes:'1080',maxSizeGB:2,keepUnknown:false,subtitles:'required'}))")
+          curl -fsS "http://127.0.0.1:7000/$CFG/manifest.json" | grep -q 'community.cb-providers'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7000/abc/manifest.json)" = "400"
+          test "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:7000/$CFG/stream/movie/not-an-id.json")" = "400"
           echo "smoke test passed"
