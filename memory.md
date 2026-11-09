@@ -16,6 +16,7 @@ Conventions:
 - Providers: 28 vendored from `SA7ANI/cb-providers`, 27 active (Torrentio disabled in addon code but kept for daily sync), upstream SHA `40514501c0505474bc6a0d8e1d9821c2a2e37020`
 - CI/CD: GitHub Actions CI on push; upstream sync daily 03:17 UTC; Render auto-deploy after CI checks pass
 - Verified live before the torrent disable: `/health` showed 28 providers; `tt0137523` returned 66 streams from 12 providers (70 streams / 16 providers locally)
+- IDs: manifest advertises `tt` and `tmdb:`; `tmdb:` ids go straight to providers, `tt` ids resolve via Cinemeta/TMDB
 - Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
 - Manifest advertises both `stream` and `subtitles` resources; `/subtitles/{type}/{id}` aggregates provider tracks from the shared raw cache
 - TMDB fallback: user-supplied key stored as a Render secret (not in git); providers still use their embedded keys
@@ -23,6 +24,14 @@ Conventions:
 - Keep-alive: `.github/workflows/keep-alive.yml` pings `/health` every 10 min via four daily 5h50m jobs (~1,400 Actions min/month)
 
 ## Log
+
+### 2026-11-09 - Direct TMDB id support
+
+- Manifest now advertises `idPrefixes: ["tt", "tmdb:"]` (Nuvio's addons screen shows "2 id rules").
+- New `content-id.js` parses `tt1234567[:season:episode]` and `tmdb:123[:season:episode]`; all other id shapes return `400`.
+- `streams.js` uses `tmdb:` ids directly and only calls Cinemeta/TMDB resolution for `tt` ids; raw stream cache keys use the canonical content id.
+- Why: AIOMetadata TMDB-sourced catalogs emit `tmdb:` ids, and Nuvio only queries stream addons whose `idPrefixes` match the item id, so those titles previously never reached the addon. MAL/Kitsu (`mal:`, `kitsu:`) ids are still unsupported.
+- Verification: `npm test`, `npm run lint`; local smoke with `PROVIDERS=netmirror`: `tmdb:550` (Fight Club) returned a NetMirror stream, `tmdb:1399` series without episode returned `{"streams":[]}`, invalid ids returned `400`.
 
 ### 2026-11-08 - Stremio subtitles resource for Nuvio Mobile
 

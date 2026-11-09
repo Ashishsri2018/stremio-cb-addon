@@ -2,7 +2,7 @@
   "name": "stremio-cb-addon",
   "version": "1.0.0",
   "private": true,
-  "description": "Stremio stream addon powered by CB Providers, resolved from IMDb IDs",
+  "description": "Stremio stream addon powered by CB Providers, resolved from IMDb and TMDB IDs",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -5,6 +5,7 @@ const config = require('./config');
 const { getRegistry } = require('./providers');
 const { collectStreams, collectSubtitles, getRuntimeStats } = require('./streams');
 const { DEFAULT_CONFIG, decodeConfig } = require('./filters');
+const { parseContentId, toContentId } = require('./content-id');
 
 const logoPath = path.join(__dirname, 'logo.png');
 const configurePath = path.join(__dirname, 'configure.html');
@@ -16,7 +17,6 @@ const configManifestRoute = /^\/([A-Za-z0-9_-]{1,512})\/manifest\.json$/;
 const configStreamRoute = /^\/([A-Za-z0-9_-]{1,512})\/stream\/(movie|series)\/([^/]+)\.json$/;
 const configSubtitleRoute =
   /^\/([A-Za-z0-9_-]{1,512})\/subtitles\/(movie|series)\/([^/]+?)(?:\/[^/]+)?\.json$/;
-const imdbPattern = /^(tt\d+)(?::(\d+):(\d+))?$/;
 
 let configureHtml = null;
 try {
@@ -50,11 +50,11 @@ function manifestFor(req) {
     version: '1.0.0',
     name: config.addonName,
     description:
-      'Multi-provider stream addon powered by the CB Providers fleet (MoviesDrive, 4KHDHub, HDHub4u, VegaMovies, NetMirror, anime providers and more). Resolves content from IMDb IDs and serves provider subtitle tracks. Configure resolution, size, and subtitle filters at /configure.',
+      'Multi-provider stream addon powered by the CB Providers fleet (MoviesDrive, 4KHDHub, HDHub4u, VegaMovies, NetMirror, anime providers and more). Resolves content from IMDb or TMDB IDs and serves provider subtitle tracks. Configure resolution, size, and subtitle filters at /configure.',
     logo: `${baseUrl(req)}/logo.png`,
     types: ['movie', 'series'],
     resources: ['stream', 'subtitles'],
-    idPrefixes: ['tt'],
+    idPrefixes: ['tt', 'tmdb:'],
     catalogs: [],
     behaviorHints: { configurable: true },
   };
@@ -204,15 +204,17 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const idMatch = imdbPattern.exec(rawId);
-  if (!idMatch) {
-    sendJson(res, 400, { error: 'Expected IMDb id: tt1234567 or tt1234567:season:episode' });
+  const parsedId = parseContentId(rawId);
+  if (!parsedId) {
+    sendJson(res, 400, {
+      error:
+        'Expected id: tt1234567, tt1234567:season:episode, tmdb:123 or tmdb:123:season:episode',
+    });
     return;
   }
 
-  const imdbId = idMatch[1];
-  const season = idMatch[2] ? Number(idMatch[2]) : null;
-  const episode = idMatch[3] ? Number(idMatch[3]) : null;
+  const contentId = toContentId(parsedId);
+  const { season, episode } = parsedId;
 
   if (type === 'series' && (season === null || episode === null)) {
     sendJson(res, 200, route.kind === 'subtitles' ? { subtitles: [] } : { streams: [] });
@@ -220,9 +222,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    const label = season === null ? imdbId : `${imdbId} S${season}E${episode}`;
+    const label = season === null ? contentId : `${contentId} S${season}E${episode}`;
     if (route.kind === 'subtitles') {
-      const subtitles = await collectSubtitles(imdbId, type, season, episode);
+      const subtitles = await collectSubtitles(contentId, type, season, episode);
       console.log(
         `[server] subtitles ${type} ${label} -> ${subtitles.length} tracks (${Date.now() - started}ms)`
       );
@@ -230,13 +232,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const streams = await collectStreams(imdbId, type, season, episode, userConfig);
+    const streams = await collectStreams(contentId, type, season, episode, userConfig);
     console.log(
       `[server] ${type} ${label} -> ${streams.length} streams (${Date.now() - started}ms)`
     );
     sendJson(res, 200, { streams });
   } catch (err) {
-    console.error(`[server] ${type} ${imdbId}: ${err.stack || err.message}`);
+    console.error(`[server] ${type} ${contentId}: ${err.stack || err.message}`);
     sendJson(res, 500, { error: 'Internal error' });
   }
 });

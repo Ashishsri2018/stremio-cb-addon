@@ -1,5 +1,6 @@
 const config = require('./config');
 const { getRegistry, providersFor } = require('./providers');
+const { tmdbIdOf } = require('./content-id');
 const cinemeta = require('./cinemeta');
 const { qualityRank, toStremioStream } = require('./format');
 const { DEFAULT_CONFIG, normalizeSubtitles, streamPassesFilters } = require('./filters');
@@ -7,8 +8,8 @@ const { createBreaker } = require('./lib/breaker');
 const { createStreamCache } = require('./lib/stream-cache');
 const { TimeoutError, withTimeout } = require('./lib/timeout');
 
-function streamKey(type, imdbId, season, episode) {
-  return `${type}:${imdbId}:${season ?? ''}:${episode ?? ''}`;
+function streamKey(type, contentId, season, episode) {
+  return `${type}:${contentId}:${season ?? ''}:${episode ?? ''}`;
 }
 
 function validStream(stream) {
@@ -54,12 +55,12 @@ function createCollector({
   now = Date.now,
   logger = console,
 } = {}) {
-  async function runProviders(imdbId, type, season, episode) {
+  async function runProviders(contentId, type, season, episode) {
     const deadline = now() + deadlineMs;
     const mediaType = type === 'series' ? 'tv' : 'movie';
-    const tmdbId = await resolveTmdbId(imdbId, type);
+    const tmdbId = tmdbIdOf(contentId) ?? (await resolveTmdbId(contentId, type));
     if (!tmdbId) {
-      logger.warn(`[streams] no TMDB id resolved for ${imdbId}`);
+      logger.warn(`[streams] no TMDB id resolved for ${contentId}`);
       return [];
     }
 
@@ -110,10 +111,10 @@ function createCollector({
     return dedupe(results);
   }
 
-  async function collectStreams(imdbId, type, season, episode, userConfig = DEFAULT_CONFIG) {
-    const key = streamKey(type, imdbId, season, episode);
+  async function collectStreams(contentId, type, season, episode, userConfig = DEFAULT_CONFIG) {
+    const key = streamKey(type, contentId, season, episode);
     const raw = await cache.getOrLoad(key, () =>
-      runProviders(imdbId, type, season, episode)
+      runProviders(contentId, type, season, episode)
     );
 
     const filtered = raw
@@ -133,10 +134,10 @@ function createCollector({
       .filter(Boolean);
   }
 
-  async function collectSubtitles(imdbId, type, season, episode) {
-    const key = streamKey(type, imdbId, season, episode);
+  async function collectSubtitles(contentId, type, season, episode) {
+    const key = streamKey(type, contentId, season, episode);
     const raw = await cache.getOrLoad(key, () =>
-      runProviders(imdbId, type, season, episode)
+      runProviders(contentId, type, season, episode)
     );
 
     const seen = new Set();

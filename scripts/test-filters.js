@@ -10,6 +10,7 @@ const {
   sizeBytesOf,
 } = require('../filters');
 const { toStremioStream } = require('../format');
+const { parseContentId, toContentId, tmdbIdOf } = require('../content-id');
 
 function check(name, fn) {
   try {
@@ -36,6 +37,47 @@ check('config round-trips through base64url', () => {
   assert.strictEqual(decodeConfig('abc'), null);
   assert.strictEqual(decodeConfig(Buffer.from('[1,2]').toString('base64url')), null);
   assert.strictEqual(decodeConfig(''), null);
+});
+
+check('content id parsing accepts imdb and tmdb ids', () => {
+  assert.deepStrictEqual(parseContentId('tt0137523'), {
+    source: 'imdb',
+    id: 'tt0137523',
+    season: null,
+    episode: null,
+  });
+  assert.deepStrictEqual(parseContentId('tt0944947:1:2'), {
+    source: 'imdb',
+    id: 'tt0944947',
+    season: 1,
+    episode: 2,
+  });
+  assert.deepStrictEqual(parseContentId('tmdb:550'), {
+    source: 'tmdb',
+    id: 550,
+    season: null,
+    episode: null,
+  });
+  assert.deepStrictEqual(parseContentId('tmdb:1399:3:4'), {
+    source: 'tmdb',
+    id: 1399,
+    season: 3,
+    episode: 4,
+  });
+  assert.strictEqual(toContentId(parseContentId('tmdb:1399:3:4')), 'tmdb:1399');
+  assert.strictEqual(toContentId(parseContentId('tt0137523')), 'tt0137523');
+  assert.strictEqual(tmdbIdOf('tmdb:550'), 550);
+  assert.strictEqual(tmdbIdOf('tt0137523'), null);
+});
+
+check('content id parsing rejects unsupported ids', () => {
+  assert.strictEqual(parseContentId('tmdb:'), null);
+  assert.strictEqual(parseContentId('tmdb:abc'), null);
+  assert.strictEqual(parseContentId('kitsu:50074:1'), null);
+  assert.strictEqual(parseContentId('tt0944947:1'), null);
+  assert.strictEqual(parseContentId('ttabc'), null);
+  assert.strictEqual(parseContentId(''), null);
+  assert.strictEqual(parseContentId(null), null);
 });
 
 check('resolution detection', () => {

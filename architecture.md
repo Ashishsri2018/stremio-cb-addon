@@ -1,13 +1,13 @@
 # Architecture
 
-Stremio stream addon that wraps the CB Providers (Nuvio) scraper fleet and answers requests using IMDb IDs.
+Stremio stream addon that wraps the CB Providers (Nuvio) scraper fleet and answers requests using IMDb or TMDB IDs.
 
 ## System overview
 
 ```
 Stremio/Nuvio client
-  |  GET /stream/{movie|series}/{imdb-id}.json
-  |  GET /subtitles/{movie|series}/{imdb-id}.json
+  |  GET /stream/{movie|series}/{content-id}.json
+  |  GET /subtitles/{movie|series}/{content-id}.json
   v
 server.js (Node >=18, Render)
   |-- cinemeta.js   IMDb ID -> TMDB ID (Cinemeta and TMDB raced, bounded LRU, 24h/60s TTL)
@@ -32,16 +32,17 @@ Manifest (`/manifest.json`):
 - `id`: `community.cb-providers`
 - `resources`: `["stream", "subtitles"]`
 - `types`: `["movie", "series"]`
-- `idPrefixes`: `["tt"]`
+- `idPrefixes`: `["tt", "tmdb:"]` (Nuvio renders this as "2 id rules")
 - `catalogs`: `[]`
 - `behaviorHints.configurable`: `true`; `/configure` serves the settings page.
 
 Stream routes:
 
-- Movie: `/stream/movie/tt0137523.json`
-- Series episode: `/stream/series/tt0944947:1:1.json` (`id = imdbId:season:episode`)
+- Movie: `/stream/movie/tt0137523.json` or `/stream/movie/tmdb:550.json`
+- Series episode: `/stream/series/tt0944947:1:1.json` or `/stream/series/tmdb:1399:1:1.json` (`id = contentId:season:episode`)
+- `tt` IDs resolve to TMDB through Cinemeta/TMDB; `tmdb:` IDs are passed to providers directly with no metadata lookup. `content-id.js` parses both forms.
 - Series without season/episode returns `200 {"streams":[]}` because providers require an episode.
-- Invalid IMDb ID returns `400`; unknown routes return `404`; unexpected failures return `500`.
+- Invalid IDs return `400`; unknown routes return `404`; unexpected failures return `500`.
 - All routes accept `GET` and `HEAD`; `HEAD` runs the same route logic with the body suppressed, so uptime pingers such as UptimeRobot get a 200. Other methods return `405`.
 - `GET /health` returns `{ ok, providers, uptimeSec, circuits: { open, halfOpen }, cacheEntries }` (cheap; used by Render); `providers` is the active (non-disabled) count.
 - `GET /stats` returns detailed in-memory telemetry: per-provider circuit state and counters, stream cache stats, and metadata cache stats.
@@ -49,8 +50,8 @@ Stream routes:
 
 Subtitle routes:
 
-- Movie: `/subtitles/movie/tt0137523.json`
-- Series episode: `/subtitles/series/tt0944947:1:1.json`
+- Movie: `/subtitles/movie/tt0137523.json` or `/subtitles/movie/tmdb:550.json`
+- Series episode: `/subtitles/series/tt0944947:1:1.json` or `/subtitles/series/tmdb:1399:1:1.json`
 - The optional Stremio extras segment (`/videoHash=...&videoSize=...&filename=....json`) is accepted and ignored.
 - Response is `{ "subtitles": [{ "id", "url", "lang" }] }`, aggregated from every provider stream for that title and deduped by URL. It shares the 3-minute raw stream cache and does not apply user filters.
 - Series without season/episode returns `200 {"subtitles":[]}`.
@@ -77,7 +78,7 @@ Stream object mapping (format.js):
 
 Results are ordered by quality rank, then provider health (Laplace-smoothed `ok/calls`), then manifest order.
 
-Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) keyed by `type:imdbId:season:episode`, before user filters and formatting, so one entry serves every filter configuration and the subtitle endpoint. The cache is bounded (`STREAM_CACHE_MAX_ENTRIES`), stores only non-empty results, and coalesces concurrent identical requests. URLs are time-signed, so the TTL stays short and can be disabled with `0`.
+Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) keyed by `type:contentId:season:episode`, before user filters and formatting, so one entry serves every filter configuration and the subtitle endpoint. The cache is bounded (`STREAM_CACHE_MAX_ENTRIES`), stores only non-empty results, and coalesces concurrent identical requests. URLs are time-signed, so the TTL stays short and can be disabled with `0`.
 
 ## Components
 
@@ -85,6 +86,7 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 | --- | --- |
 | `server.js` | HTTP server, routing, CORS, manifest, logo, JSON responses |
 | `config.js` | Environment configuration with defaults |
+| `content-id.js` | Parses `tt<id>[:season:episode]` and `tmdb:<id>[:season:episode]` content IDs |
 | `providers.js` | Reads vendored manifest, skips disabled ids, requires provider modules, type filtering |
 | `cinemeta.js` | IMDb -> TMDB resolution and caching |
 | `streams.js` | Provider orchestration, timeouts, dedupe, stream filtering/quality sorting, subtitle aggregation |

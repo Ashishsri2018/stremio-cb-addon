@@ -61,11 +61,11 @@ function provider(id, order, getStreams) {
   return { id, name: id, order, types: ['movie'], getStreams };
 }
 
-function makeCollector({ providers, breaker, cache, timeoutMs = 5 }) {
+function makeCollector({ providers, breaker, cache, timeoutMs = 5, resolveTmdbId = async () => 1 }) {
   return createCollector({
     providersFor: () => providers,
     getProviders: () => providers,
-    resolveTmdbId: async () => 1,
+    resolveTmdbId,
     getMetadataCacheStats: () => ({ size: 0 }),
     breaker,
     cache,
@@ -416,6 +416,42 @@ async function main() {
     const stats = collector.getRuntimeStats();
     assert.strictEqual(stats.circuits.total, 1);
     assert.strictEqual(stats.providers[0].ok, 1);
+  });
+
+  await checkAsync('collector uses tmdb content ids without metadata lookup', async () => {
+    let resolverCalls = 0;
+    let received;
+    const source = provider('p', 0, async (tmdbId, mediaType, season, episode) => {
+      received = { tmdbId, mediaType, season, episode };
+      return [{ url: 'https://x/tmdb.m3u8', quality: '1080p' }];
+    });
+    const collector = makeCollector({
+      providers: [source],
+      resolveTmdbId: async () => {
+        resolverCalls += 1;
+        return 1;
+      },
+    });
+
+    const streams = await collector.collectStreams('tmdb:550', 'movie', null, null, DEFAULT_CONFIG);
+    assert.strictEqual(streams.length, 1);
+    assert.strictEqual(resolverCalls, 0);
+    assert.deepStrictEqual(received, {
+      tmdbId: '550',
+      mediaType: 'movie',
+      season: null,
+      episode: null,
+    });
+
+    const episodeStreams = await collector.collectStreams('tmdb:1399', 'series', 3, 4, DEFAULT_CONFIG);
+    assert.strictEqual(episodeStreams.length, 1);
+    assert.strictEqual(resolverCalls, 0);
+    assert.deepStrictEqual(received, {
+      tmdbId: '1399',
+      mediaType: 'tv',
+      season: 3,
+      episode: 4,
+    });
   });
 
   await checkAsync('collector aggregates and dedupes subtitles across provider streams', async () => {
