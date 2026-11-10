@@ -8,14 +8,14 @@ Conventions:
 - Docs-only commits: `git commit -m "docs: ... [skip ci] [skip render]"`.
 - Keep the "Current state" section short and current.
 
-## Current state (2026-11-08)
+## Current state (2026-11-10)
 
 - Repo: `https://github.com/Ashishsri2018/stremio-cb-addon` (private, GPL-3.0)
 - Live addon: `https://stremio-cb-addon.onrender.com` (install with `/manifest.json`)
 - Render service: `srv-dbo0nv3rjlhs73a3qavg`, free plan, Singapore, health `/health`
-- Providers: 28 vendored from `SA7ANI/cb-providers`, 27 active (Torrentio disabled in addon code but kept for daily sync), upstream SHA `40514501c0505474bc6a0d8e1d9821c2a2e37020`
+- Providers: 28 vendored from `SA7ANI/cb-providers`, 27 active (Torrentio disabled in addon code but kept for daily sync), upstream SHA `e66d80656b4b1ec79aa391cb5a864ae98de36fa1`
 - CI/CD: GitHub Actions CI on push; upstream sync daily 03:17 UTC; Render auto-deploy after CI checks pass
-- Verified live before the torrent disable: `/health` showed 28 providers; `tt0137523` returned 66 streams from 12 providers (70 streams / 16 providers locally)
+- Verified live on 2026-11-10: `/health` ok with 27 providers; `tt0137523` returned 53 streams, `tmdb:550` returned 54 streams, series `tt0944947:1:1` returned 31 streams; all 27 circuits closed/healthy
 - IDs: manifest advertises `tt` and `tmdb:`; `tmdb:` ids go straight to providers, `tt` ids resolve via Cinemeta/TMDB
 - Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
 - Manifest advertises both `stream` and `subtitles` resources; `/subtitles/{type}/{id}` aggregates provider tracks from the shared raw cache
@@ -24,6 +24,12 @@ Conventions:
 - Keep-alive: `.github/workflows/keep-alive.yml` pings `/health` every 10 min via four daily 5h50m jobs (~1,400 Actions min/month)
 
 ## Log
+
+### 2026-11-10 - Upstream sync and verification (e66d806)
+
+- Scheduled workflow `.github/workflows/sync-upstream.yml` ran successfully (run 42805185951, commit `8400292`), vendoring upstream `SA7ANI/cb-providers` @ `e66d80656b`.
+- Updated provider files: `desiflix.js`, `puretoons.js`, `toonstream.js`, `vidrock.js`.
+- Render auto-deployed and is live. Verified `/health` (ok, 27 active providers), `/stats` (all 27 circuits closed, 0 open), `/manifest.json`, movie `tt0137523` (53 streams across 10 providers), `tmdb:550` (54 streams), series `tt0944947:1:1` (31 streams), and `/subtitles` (1 track). All local tests and `verify.js` (27/27) pass.
 
 ### 2026-11-09 - Direct TMDB id support
 
