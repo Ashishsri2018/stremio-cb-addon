@@ -143,7 +143,7 @@ function hasSubtitleText(stream, code) {
 
   if (code === 'required') return SUBTITLE_WORD.test(text);
   if (code === 'multi') return /multi[- ]?(?:subs?|subtitles?)/i.test(text);
-  if (code === 'en' && /\besubs?\b/i.test(text)) return true;
+  if (code === 'en' && /\be[-. ]?subs?\b/i.test(text)) return true;
 
   const lang = LANG_TEXT[code];
   if (!lang) return false;

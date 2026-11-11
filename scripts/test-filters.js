@@ -162,6 +162,19 @@ check('subtitle filter by language and presence', () => {
     ),
     true
   );
+
+  const esubTitle = 'Fight.Club.2023.Hindi.720p.WEB-DL.DDP.5.1.E-Sub.- moviesdrives.com.mkv';
+  assert.strictEqual(
+    streamPassesFilters({ title: esubTitle }, { ...DEFAULT_CONFIG, subtitles: 'en' }),
+    true
+  );
+  assert.strictEqual(
+    streamPassesFilters(
+      { title: 'Movie 720p E.Sub' },
+      { ...DEFAULT_CONFIG, subtitles: 'en' }
+    ),
+    true
+  );
 });
 
 check('formatter keeps subtitles and size hint for direct streams', () => {
@@ -189,6 +202,7 @@ check('web page detection distinguishes video streams from web pages and embeds'
   assert.strictEqual(isWebPage('https://cdn.test/video.mp4?token=123'), false);
   assert.strictEqual(isWebPage('https://cdn.test/video.mkv'), false);
   assert.strictEqual(isWebPage('https://cdn.test/video.mpd'), false);
+  assert.strictEqual(isWebPage('https://cdn.test/download/abc123'), false);
   assert.strictEqual(
     isWebPage('https://b6a3a2c1.r2.cloudflarestorage.com/hub/file.mkv?X-Amz=1'),
     false

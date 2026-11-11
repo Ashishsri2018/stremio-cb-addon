@@ -25,6 +25,14 @@ Conventions:
 
 ## Log
 
+### 2026-11-11 - Fix MoviesDrive disappearing under `subtitles=en`
+
+- Symptom: with `{"subtitles":"en"}`, MoviesDrive results vanished while unfiltered requests still returned them.
+- Cause: MoviesDrive titles use `E-Sub` / `E.Sub`; `hasSubtitleText` only recognized `esub`, so the streams looked like known non-English subtitles and were dropped even with `keepUnknown`.
+- Fix: recognize `E-Sub`, `E.Sub`, `E Sub`, and `ESub` as English subtitle hints in `filters.js`.
+- Extensionless file URLs were already treated as direct streams by `lib/url-classifier.js`; added a regression assertion so they stay playable `url` values instead of being reclassified as web pages.
+- Verification: `npm test` and `npm run lint` pass; replaying live MoviesDrive results through the configured filter now keeps the 720p and 480p entries.
+
 ### 2026-11-11 - Stream limits (100/provider, 1000 global) and same-file URL deduplication
 
 - Introduced `MAX_PER_PROVIDER_STREAMS` (default 100) and `MAX_TOTAL_STREAMS` (default 1000) configurable via `config.js` and environment variables.
