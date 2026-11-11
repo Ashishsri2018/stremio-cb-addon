@@ -10,7 +10,9 @@
 - [x] Hide secrets, live domain URLs, and host service IDs across codebase and workflows
 - [x] Make `keep-alive.yml` safely use `HEALTH_CHECK_URL` repository secret
 - [x] Update documentation (`architecture.md`, `memory.md`, `README.md`)
-- [ ] Push sanitized commits to GitHub repository
+- [x] Push sanitized commits to GitHub repository
+- [x] Configure `HEALTH_CHECK_URL` Actions secret and convert repository visibility to public
+- [x] Verify GitHub Actions CI passing on public repository
 
 ## Future Improvements
 - [ ] Residential/proxy support to mitigate datacenter IP blocking on cloud hosts
