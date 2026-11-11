@@ -13,6 +13,10 @@
 - [x] Push sanitized commits to GitHub repository
 - [x] Configure `HEALTH_CHECK_URL` Actions secret and convert repository visibility to public
 - [x] Verify GitHub Actions CI passing on public repository
+- [x] Enforce per-provider limit of 100 streams in `streams.js` (`MAX_PER_PROVIDER_STREAMS`)
+- [x] Enforce global limit of 1000 streams in `streams.js` (`MAX_TOTAL_STREAMS`)
+- [x] Canonical same-file URL deduplication (`normalizeStreamKey`) stripping fragments, trailing slashes, and casing
+- [x] Add unit tests for per-provider limit, global limit, and same-file deduplication in `scripts/test-runtime.js`
 
 ## Future Improvements
 - [ ] Residential/proxy support to mitigate datacenter IP blocking on cloud hosts

@@ -81,6 +81,11 @@ Stream object mapping (format.js & lib/url-classifier.js):
 
 Results are ordered direct in-app video streams first, followed by external web page links. Within each tier, items are ordered by quality rank, then provider health (Laplace-smoothed `ok/calls`), then manifest order.
 
+Stream limits and deduplication:
+- **Per-provider stream limit**: Each scraper is capped at 100 valid streams (`MAX_PER_PROVIDER_STREAMS`) before deduplication and caching to prevent any single scraper from monopolizing results.
+- **Same-file canonical deduplication**: URLs are canonicalized (`normalizeStreamKey`), stripping URL fragments, trailing slashes, and hostname casing, so duplicate links to the identical file across providers or scrapers are removed while retaining unique streams.
+- **Global stream limit**: The final sorted, filtered stream collection is capped at 1000 streams (`MAX_TOTAL_STREAMS`).
+
 Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) keyed by `type:contentId:season:episode`, before user filters and formatting, so one entry serves every filter configuration and the subtitle endpoint. The cache is bounded (`STREAM_CACHE_MAX_ENTRIES`), stores only non-empty results, and coalesces concurrent identical requests. URLs are time-signed, so the TTL stays short and can be disabled with `0`.
 
 ## Components
@@ -151,6 +156,8 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 | `STREAM_CACHE_TTL_MS` | `180000` | Raw stream cache TTL; `0` disables storage |
 | `STREAM_CACHE_MAX_ENTRIES` | `500` | Raw stream cache entry cap |
 | `TMDB_CACHE_MAX_ENTRIES` | `5000` | IMDb→TMDB resolution cache cap |
+| `MAX_PER_PROVIDER_STREAMS` | `100` | Max valid streams retained per provider scraper before dedupe/cache |
+| `MAX_TOTAL_STREAMS` | `1000` | Overall maximum streams returned in a response |
 
 ## User filters
 

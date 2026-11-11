@@ -24,17 +24,32 @@ function validStream(stream) {
   return typeof stream.infoHash === 'string' && stream.infoHash.length > 0;
 }
 
+function normalizeStreamKey(stream) {
+  if (!stream) return '';
+  const targetUrl = stream.url || stream.externalUrl;
+  if (typeof targetUrl === 'string' && targetUrl.length > 0) {
+    try {
+      const parsed = new URL(targetUrl);
+      const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+      return `${parsed.protocol}//${parsed.host.toLowerCase()}${pathname}${parsed.search}`;
+    } catch {
+      return targetUrl.replace(/#.*$/, '').replace(/\/+$/, '');
+    }
+  }
+  if (typeof stream.infoHash === 'string' && stream.infoHash.length > 0) {
+    return `torrent:${stream.infoHash.toLowerCase()}:${stream.fileIdx || 0}`;
+  }
+  return '';
+}
+
 function dedupe(results) {
   const seen = new Set();
   const deduped = [];
 
   for (const list of results) {
     for (const item of list) {
-      const key =
-        item.stream.url ||
-        item.stream.externalUrl ||
-        `${item.stream.infoHash}:${item.stream.fileIdx || 0}`;
-      if (seen.has(key)) continue;
+      const key = normalizeStreamKey(item.stream);
+      if (!key || seen.has(key)) continue;
       seen.add(key);
       deduped.push(item);
     }
@@ -59,6 +74,8 @@ function createCollector({
   providerTimeoutMs = config.providerTimeoutMs,
   deadlineMs = config.deadlineMs,
   minProviderTimeoutMs = 1000,
+  maxPerProviderStreams = config.maxPerProviderStreams,
+  maxTotalStreams = config.maxTotalStreams,
   now = Date.now,
   logger = console,
 } = {}) {
@@ -91,6 +108,7 @@ function createCollector({
           );
           const list = (Array.isArray(streams) ? streams : [])
             .filter(validStream)
+            .slice(0, maxPerProviderStreams)
             .map((stream) => ({ stream, provider }));
           breaker.record(provider.id, list.length > 0 ? 'ok' : 'empty', {
             latencyMs: now() - started,
@@ -140,9 +158,11 @@ function createCollector({
       return a.provider.order - b.provider.order;
     });
 
-    return filtered
+    const streams = filtered
       .map((item) => toStremioStream(item.stream, item.provider))
       .filter(Boolean);
+
+    return streams.slice(0, maxTotalStreams);
   }
 
   async function collectSubtitles(contentId, type, season, episode) {
@@ -209,4 +229,6 @@ module.exports = {
   collectStreams: defaultCollector.collectStreams,
   collectSubtitles: defaultCollector.collectSubtitles,
   getRuntimeStats: defaultCollector.getRuntimeStats,
+  normalizeStreamKey,
+  dedupe,
 };

@@ -16,6 +16,7 @@ Conventions:
 - CI/CD: GitHub Actions CI on push; upstream sync daily 03:17 UTC; Render auto-deploy after CI checks pass
 - IDs: manifest advertises `tt` and `tmdb:`; `tmdb:` ids go straight to providers, `tt` ids resolve via Cinemeta/TMDB
 - Stream classification: `lib/url-classifier.js` categorizes stream URLs into direct video streams vs web pages / embeds / archives (`.zip`). Web pages are mapped to Stremio `externalUrl` (preventing player errors) and sorted behind direct streams; anti-bot blocker links (`/slowdown`) are dropped at ingestion
+- Stream limits & deduplication: each scraper is capped at 100 streams (`MAX_PER_PROVIDER_STREAMS`), duplicates to the same file are canonicalized and removed (`normalizeStreamKey`), and the global stream response is capped at 1000 streams (`MAX_TOTAL_STREAMS`)
 - Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
 - Manifest advertises both `stream` and `subtitles` resources; `/subtitles/{type}/{id}` aggregates provider tracks from the shared raw cache
 - TMDB fallback: user-supplied key stored as a hosting environment variable / secret (not in git); providers still use their embedded keys
@@ -23,6 +24,14 @@ Conventions:
 - Keep-alive: `.github/workflows/keep-alive.yml` pings `/health` (via `HEALTH_CHECK_URL` secret) every 10 min via four daily 5h50m jobs
 
 ## Log
+
+### 2026-11-11 - Stream limits (100/provider, 1000 global) and same-file URL deduplication
+
+- Introduced `MAX_PER_PROVIDER_STREAMS` (default 100) and `MAX_TOTAL_STREAMS` (default 1000) configurable via `config.js` and environment variables.
+- Applied per-provider slice to cap single scrapers at 100 valid streams in `streams.js` before caching and deduplication.
+- Enhanced `dedupe` with `normalizeStreamKey` to canonicalize URLs (stripping URL hash fragments, trailing slashes, and hostname casing) to eliminate same-file duplicates across providers while preserving unique streams.
+- Applied global cap of 1000 streams to the final filtered, sorted Stremio stream results in `collectStreams`.
+- Added unit tests in `scripts/test-runtime.js` covering `normalizeStreamKey`, same-file `dedupe`, per-provider 100-stream ceiling, and global stream cap. Passed all tests, linter, verification, and audit gate.
 
 ### 2026-11-11 - Sanitize secrets and live domain for public repository release
 

@@ -4,7 +4,7 @@ const { createBreaker } = require('../lib/breaker');
 const { createStreamCache } = require('../lib/stream-cache');
 const { TimeoutError, withTimeout } = require('../lib/timeout');
 const { createMetadataResolver } = require('../cinemeta');
-const { createCollector } = require('../streams');
+const { createCollector, normalizeStreamKey, dedupe } = require('../streams');
 const { DEFAULT_CONFIG } = require('../filters');
 
 const silentLogger = { log() {}, warn() {}, error() {} };
@@ -61,7 +61,15 @@ function provider(id, order, getStreams) {
   return { id, name: id, order, types: ['movie'], getStreams };
 }
 
-function makeCollector({ providers, breaker, cache, timeoutMs = 5, resolveTmdbId = async () => 1 }) {
+function makeCollector({
+  providers,
+  breaker,
+  cache,
+  timeoutMs = 5,
+  resolveTmdbId = async () => 1,
+  maxPerProviderStreams,
+  maxTotalStreams,
+}) {
   return createCollector({
     providersFor: () => providers,
     getProviders: () => providers,
@@ -72,6 +80,8 @@ function makeCollector({ providers, breaker, cache, timeoutMs = 5, resolveTmdbId
     providerTimeoutMs: timeoutMs,
     deadlineMs: 1000,
     minProviderTimeoutMs: 1,
+    maxPerProviderStreams,
+    maxTotalStreams,
     logger: silentLogger,
   });
 }
@@ -617,6 +627,79 @@ async function main() {
     assert.strictEqual(stats.providers[0].id, 'a');
     assert.strictEqual(stats.streamCache.sets, 1);
     assert.ok(stats.metadataCache);
+  });
+
+  check('normalizeStreamKey canonicalizes URLs, fragments, trailing slashes, and torrents', () => {
+    assert.strictEqual(
+      normalizeStreamKey({ url: 'https://EXAMPLE.com:443/video.mp4#t=10' }),
+      'https://example.com/video.mp4'
+    );
+    assert.strictEqual(
+      normalizeStreamKey({ externalUrl: 'https://example.com/embed/' }),
+      'https://example.com/embed'
+    );
+    assert.strictEqual(
+      normalizeStreamKey({ url: 'https://example.com/stream?token=abc' }),
+      'https://example.com/stream?token=abc'
+    );
+    assert.strictEqual(
+      normalizeStreamKey({ infoHash: 'ABCD1234EF', fileIdx: 2 }),
+      'torrent:abcd1234ef:2'
+    );
+  });
+
+  check('dedupe removes duplicate URLs pointing to the same file', () => {
+    const list1 = [
+      { stream: { url: 'https://cdn.example.com/file.m3u8' } },
+      { stream: { url: 'https://CDN.EXAMPLE.COM/file.m3u8#track=1' } },
+      { stream: { url: 'https://cdn.example.com/file2.m3u8' } },
+    ];
+    const list2 = [
+      { stream: { url: 'https://cdn.example.com/file.m3u8/' } },
+      { stream: { url: 'https://cdn.example.com/file3.m3u8' } },
+    ];
+    const deduped = dedupe([list1, list2]);
+    assert.strictEqual(deduped.length, 3);
+    assert.strictEqual(deduped[0].stream.url, 'https://cdn.example.com/file.m3u8');
+    assert.strictEqual(deduped[1].stream.url, 'https://cdn.example.com/file2.m3u8');
+    assert.strictEqual(deduped[2].stream.url, 'https://cdn.example.com/file3.m3u8');
+  });
+
+  await checkAsync('collector caps per-provider streams to 100 by default', async () => {
+    const p1 = provider('p1', 0, async () => {
+      const items = [];
+      for (let i = 0; i < 150; i += 1) {
+        items.push({ url: `https://p1.test/video_${i}.mp4`, quality: '1080p' });
+      }
+      return items;
+    });
+    const collector = makeCollector({ providers: [p1] });
+    const streams = await collector.collectStreams('tt-p1', 'movie', null, null);
+    assert.strictEqual(streams.length, 100);
+  });
+
+  await checkAsync('collector caps total streams to 1000 by default and respects limits', async () => {
+    const p1 = provider('p1', 0, async () => {
+      const items = [];
+      for (let i = 0; i < 10; i += 1) {
+        items.push({ url: `https://p1.test/stream_${i}.mp4`, quality: '1080p' });
+      }
+      return items;
+    });
+    const p2 = provider('p2', 1, async () => {
+      const items = [];
+      for (let i = 0; i < 10; i += 1) {
+        items.push({ url: `https://p2.test/stream_${i}.mp4`, quality: '720p' });
+      }
+      return items;
+    });
+
+    const collectorCustom = makeCollector({
+      providers: [p1, p2],
+      maxTotalStreams: 7,
+    });
+    const limitedStreams = await collectorCustom.collectStreams('tt-total-custom', 'movie', null, null);
+    assert.strictEqual(limitedStreams.length, 7);
   });
 
   console.log('runtime tests passed');

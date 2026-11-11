@@ -22,6 +22,8 @@ module.exports = {
   streamCacheTtlMs: envInt('STREAM_CACHE_TTL_MS', 180000, 0),
   streamCacheMaxEntries: envInt('STREAM_CACHE_MAX_ENTRIES', 500, 0),
   tmdbCacheMaxEntries: envInt('TMDB_CACHE_MAX_ENTRIES', 5000, 1),
+  maxPerProviderStreams: envInt('MAX_PER_PROVIDER_STREAMS', 100, 1),
+  maxTotalStreams: envInt('MAX_TOTAL_STREAMS', 1000, 1),
   onlyProviders: String(process.env.PROVIDERS || '')
     .split(',')
     .map((s) => s.trim())
