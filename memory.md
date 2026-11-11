@@ -25,6 +25,13 @@ Conventions:
 
 ## Log
 
+### 2026-11-11 - Canonical health and stats telemetry
+
+- Added `telemetry.js` as the single canonical response builder for both `/health` and `/stats`.
+- Both endpoints now return the same top-level shape with `snapshot`, normalized `providers` stats, stream/metadata cache stats, and request metrics.
+- Runtime counters now expose request, empty-result, deadline, provider-failure, and stream-cache set/hit/miss metrics; metadata LRU stats include sets.
+- Updated CI smoke checks to assert the canonical health/stats fields.
+
 ### 2026-11-11 - Cache parity with Nuvio and Vega
 
 - Raw stream cache keeps only non-empty results; empty responses are never stored.

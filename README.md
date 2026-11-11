@@ -18,7 +18,7 @@ A high-performance, modular [Stremio](https://www.stremio.com/) stream and subti
 - **Dual Resource Support**: Advertises both `stream` and `subtitles` resources to Stremio.
 - **Production Resilience**:
   - In-memory circuit breakers with exponential backoff for failing or slow providers.
-  - Real-time diagnostic metrics endpoint at `/stats`.
+  - Real-time diagnostic endpoints at `/health` and `/stats`, both returning the same canonical telemetry JSON.
   - 3-minute bounded LRU stream cache before per-user filtering; partial results expire after 30 seconds and empty results are never cached.
   - Cinemeta + TMDB parallel metadata racing with a 24-hour LRU cache.
 - **Automated Upstream Sync**: Daily GitHub Actions workflow syncs and verifies scrapers from upstream `SA7ANI/cb-providers`.
@@ -56,7 +56,7 @@ PROVIDERS=netmirror,moviebox npm start
 Once running:
 - Open http://127.0.0.1:7000/manifest.json in your browser or install it in Stremio.
 - Open http://127.0.0.1:7000/configure to configure custom stream filters.
-- Open http://127.0.0.1:7000/stats to view live circuit breaker and cache statistics.
+- Open http://127.0.0.1:7000/health or `/stats` to view the same live circuit, provider, cache, and request statistics.
 
 ---
 

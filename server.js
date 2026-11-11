@@ -6,6 +6,7 @@ const { getRegistry } = require('./providers');
 const { collectStreams, collectSubtitles, getRuntimeStats } = require('./streams');
 const { DEFAULT_CONFIG, decodeConfig } = require('./filters');
 const { parseContentId, toContentId } = require('./content-id');
+const { buildStatus } = require('./telemetry');
 
 const logoPath = path.join(__dirname, 'logo.png');
 const configurePath = path.join(__dirname, 'configure.html');
@@ -42,6 +43,27 @@ function baseUrl(req) {
 
 function uptimeSeconds() {
   return Math.floor((Date.now() - startedAt) / 1000);
+}
+
+function statusPayload() {
+  const runtime = getRuntimeStats();
+  return buildStatus({
+    addon: config.addonName,
+    startedAt: new Date(startedAt).toISOString(),
+    uptimeSec: uptimeSeconds(),
+    status: 'ok',
+    snapshot: null,
+    providers: {
+      total: getRegistry().length,
+      circuits: runtime.circuits,
+      stats: runtime.providers,
+    },
+    cache: {
+      stream: runtime.streamCache,
+      metadata: runtime.metadataCache,
+    },
+    metrics: runtime.metrics,
+  });
 }
 
 function manifestFor(req) {
@@ -158,26 +180,8 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (pathname === '/health') {
-    const runtime = getRuntimeStats();
-    sendJson(res, 200, {
-      ok: true,
-      providers: getRegistry().length,
-      uptimeSec: uptimeSeconds(),
-      circuits: { open: runtime.circuits.open, halfOpen: runtime.circuits.halfOpen },
-      cacheEntries: runtime.streamCache.size,
-    });
-    return;
-  }
-
-  if (pathname === '/stats') {
-    const runtime = getRuntimeStats();
-    sendJson(res, 200, {
-      ok: true,
-      startedAt: new Date(startedAt).toISOString(),
-      uptimeSec: uptimeSeconds(),
-      ...runtime,
-    });
+  if (pathname === '/health' || pathname === '/stats') {
+    sendJson(res, 200, statusPayload());
     return;
   }
 

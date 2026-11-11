@@ -6,6 +6,7 @@ const { TimeoutError, withTimeout } = require('../lib/timeout');
 const { createMetadataResolver } = require('../cinemeta');
 const { createCollector, normalizeStreamKey, dedupe } = require('../streams');
 const { DEFAULT_CONFIG } = require('../filters');
+const { buildStatus } = require('../telemetry');
 
 const silentLogger = { log() {}, warn() {}, error() {} };
 
@@ -758,6 +759,153 @@ async function main() {
     });
     const limitedStreams = await collectorCustom.collectStreams('tt-total-custom', 'movie', null, null);
     assert.strictEqual(limitedStreams.length, 7);
+  });
+
+  check('buildStatus returns the canonical telemetry shape', () => {
+    const now = Date.parse('2026-11-11T12:00:00.000Z');
+    const status = buildStatus(
+      {
+        addon: 'CB Providers',
+        startedAt: '2026-11-11T11:00:00.000Z',
+        uptimeSec: 3600,
+        status: 'degraded',
+        snapshot: {
+          sha: 'abc123',
+          fetchedAt: '2026-11-11T11:59:00.000Z',
+          refreshing: true,
+          lastError: { message: 'refresh failed' },
+        },
+        providers: {
+          total: 2,
+          circuits: { open: 1, halfOpen: 0 },
+          stats: [
+            {
+              id: 'p2',
+              state: 'open',
+              calls: 4,
+              ok: 1,
+              empty: 1,
+              errors: 1,
+              timeouts: 1,
+              skipped: 2,
+              avgMs: 20,
+              lastMs: 30,
+              maxMs: 40,
+              lastError: { message: 'timeout' },
+              lastSuccessAt: '2026-11-11T11:58:00.000Z',
+            },
+            { id: 'p1', state: 'closed', calls: 0, ok: 0 },
+          ],
+        },
+        cache: {
+          stream: { enabled: true, hits: 1, misses: 2, size: 1, ttlMs: 180000, partialTtlMs: 30000 },
+          metadata: { hits: 2, misses: 1, size: 1, maxEntries: 10 },
+        },
+        metrics: { requests: 3, cacheHits: 1, cacheMisses: 2, providerFailures: 2 },
+      },
+      now
+    );
+
+    assert.deepStrictEqual(status, {
+      ok: true,
+      addon: 'CB Providers',
+      status: 'degraded',
+      startedAt: '2026-11-11T11:00:00.000Z',
+      uptimeSec: 3600,
+      checkedAt: '2026-11-11T12:00:00.000Z',
+      snapshot: {
+        sha: 'abc123',
+        fetchedAt: '2026-11-11T11:59:00.000Z',
+        ageMs: 60000,
+        refreshing: true,
+        lastError: 'refresh failed',
+      },
+      providers: {
+        total: 2,
+        circuits: { open: 1, halfOpen: 0 },
+        stats: [
+          {
+            id: 'p1',
+            state: 'closed',
+            calls: 0,
+            ok: 0,
+            empty: null,
+            errors: null,
+            timeouts: null,
+            skipped: null,
+            successRate: null,
+            avgMs: null,
+            lastMs: null,
+            maxMs: null,
+            lastError: null,
+            lastSuccessAt: null,
+          },
+          {
+            id: 'p2',
+            state: 'open',
+            calls: 4,
+            ok: 1,
+            empty: 1,
+            errors: 1,
+            timeouts: 1,
+            skipped: 2,
+            successRate: 0.25,
+            avgMs: 20,
+            lastMs: 30,
+            maxMs: 40,
+            lastError: 'timeout',
+            lastSuccessAt: '2026-11-11T11:58:00.000Z',
+          },
+        ],
+      },
+      cache: {
+        stream: {
+          enabled: true,
+          hits: 1,
+          misses: 2,
+          coalesced: 0,
+          sets: 0,
+          evictions: 0,
+          expired: 0,
+          size: 1,
+          maxEntries: 0,
+          ttlMs: 180000,
+          partialTtlMs: 30000,
+        },
+        metadata: {
+          hits: 2,
+          misses: 1,
+          sets: 0,
+          evictions: 0,
+          expired: 0,
+          size: 1,
+          maxEntries: 10,
+        },
+      },
+      metrics: {
+        requests: 3,
+        cacheHits: 1,
+        cacheMisses: 2,
+        emptyResults: 0,
+        deadlineHits: 0,
+        settleHits: 0,
+        providerFailures: 2,
+      },
+    });
+  });
+
+  await checkAsync('collector exposes request and stream-cache metrics', async () => {
+    const p1 = provider('p1', 0, async () => [
+      { url: 'https://p1.test/metrics.mp4', quality: '1080p' },
+    ]);
+    const collector = makeCollector({ providers: [p1] });
+    await collector.collectStreams('tt-metrics', 'movie', null, null);
+    await collector.collectStreams('tt-metrics', 'movie', null, null);
+    const stats = collector.getRuntimeStats();
+    assert.strictEqual(stats.metrics.requests, 2);
+    assert.strictEqual(stats.metrics.cacheHits, 1);
+    assert.strictEqual(stats.metrics.cacheMisses, 1);
+    assert.strictEqual(stats.streamCache.sets, 1);
   });
 
   console.log('runtime tests passed');

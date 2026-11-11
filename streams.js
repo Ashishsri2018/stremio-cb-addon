@@ -85,6 +85,13 @@ function createCollector({
   now = Date.now,
   logger = console,
 } = {}) {
+  const counters = {
+    requests: 0,
+    emptyResults: 0,
+    deadlineHits: 0,
+    providerFailures: 0,
+  };
+
   async function runProviders(contentId, type, season, episode) {
     const deadline = now() + deadlineMs;
     const mediaType = type === 'series' ? 'tv' : 'movie';
@@ -126,6 +133,7 @@ function createCollector({
           return list;
         } catch (err) {
           const outcome = err instanceof TimeoutError ? 'timeout' : 'error';
+          counters.providerFailures += 1;
           breaker.record(provider.id, outcome, {
             latencyMs: now() - started,
             error: err,
@@ -141,10 +149,13 @@ function createCollector({
       })
     );
 
-    return { value: dedupe(results), partial: partial || now() >= deadline };
+    const deadlineHit = now() >= deadline;
+    if (deadlineHit) counters.deadlineHits += 1;
+    return { value: dedupe(results), partial: partial || deadlineHit };
   }
 
   async function collectStreams(contentId, type, season, episode, userConfig = DEFAULT_CONFIG) {
+    counters.requests += 1;
     const key = streamKey(type, contentId, season, episode);
     const raw = await cache.getOrLoad(key, () =>
       runProviders(contentId, type, season, episode)
@@ -168,12 +179,14 @@ function createCollector({
 
     const streams = filtered
       .map((item) => toStremioStream(item.stream, item.provider))
-      .filter(Boolean);
-
-    return streams.slice(0, maxTotalStreams);
+      .filter(Boolean)
+      .slice(0, maxTotalStreams);
+    if (streams.length === 0) counters.emptyResults += 1;
+    return streams;
   }
 
   async function collectSubtitles(contentId, type, season, episode, userConfig = DEFAULT_CONFIG) {
+    counters.requests += 1;
     const key = streamKey(type, contentId, season, episode);
     const raw = await cache.getOrLoad(key, () =>
       runProviders(contentId, type, season, episode)
@@ -219,12 +232,22 @@ function createCollector({
       };
     });
 
+    const streamCache = cache.stats();
     return {
       circuits: breaker.summary(registry.map((provider) => provider.id)),
       providers,
-      streamCache: cache.stats(),
+      streamCache,
       metadataCache:
         typeof getMetadataCacheStats === 'function' ? getMetadataCacheStats() : null,
+      metrics: {
+        requests: counters.requests,
+        cacheHits: streamCache.hits,
+        cacheMisses: streamCache.misses,
+        emptyResults: counters.emptyResults,
+        deadlineHits: counters.deadlineHits,
+        settleHits: 0,
+        providerFailures: counters.providerFailures,
+      },
     };
   }
 

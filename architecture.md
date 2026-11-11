@@ -44,8 +44,7 @@ Stream routes:
 - Series without season/episode returns `200 {"streams":[]}` because providers require an episode.
 - Invalid IDs return `400`; unknown routes return `404`; unexpected failures return `500`.
 - All routes accept `GET` and `HEAD`; `HEAD` runs the same route logic with the body suppressed, so uptime pingers such as UptimeRobot get a 200. Other methods return `405`.
-- `GET /health` returns `{ ok, providers, uptimeSec, circuits: { open, halfOpen }, cacheEntries }` (cheap; used by Render); `providers` is the active (non-disabled) count.
-- `GET /stats` returns detailed in-memory telemetry: per-provider circuit state and counters, stream cache stats, and metadata cache stats.
+- `GET /health` and `GET /stats` return the same canonical telemetry object: `ok`, `addon`, `status`, `startedAt`, `uptimeSec`, `checkedAt`, `snapshot`, `providers: { total, circuits, stats[] }`, `cache: { stream, metadata }`, and `metrics`. `/health` remains the Render probe; `/stats` is an identical alias for operators.
 - `GET /logo.png` serves the addon logo used by `/manifest.json`.
 
 Subtitle routes:
@@ -105,6 +104,7 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 | `lib/breaker.js` | Per-provider circuit breaker and health counters |
 | `lib/stream-cache.js` | 3-minute raw stream cache with in-flight coalescing |
 | `lib/timeout.js` | `TimeoutError` and promise timeout helper |
+| `telemetry.js` | Canonical `/health` and `/stats` response builder and normalization |
 | `configure.html` | Self-contained `/configure` page that builds the encoded manifest URL |
 | `scripts/verify.js` | Verifies every enabled, non-disabled provider module loads and disabled ids stay out (used by CI and sync) |
 | `scripts/check-audit.js` | `npm audit` gate: fails on new high/critical advisories, allows the unfixable legacy `cheerio-without-node-native` chain |
@@ -131,7 +131,7 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 ## Runtime resilience
 
 - Provider circuits are in-memory and per-process: 3 consecutive timeouts/errors open one for 5 minutes; after cooldown a single half-open probe decides whether to close it. Empty results reset the failure streak.
-- `/stats` exposes per-provider counters, latency, last error, and state. `/health` stays cheap for Render.
+- `/health` and `/stats` expose the same per-provider counters, latency, last error, and state; `/health` remains the Render probe and `/stats` is its identical alias.
 - Metadata: when `TMDB_API_KEY` is set, Cinemeta and TMDB are queried concurrently and the first non-null ID wins; the loser is not awaited. Both caches are bounded LRUs.
 - Streams: raw provider output is cached for 3 minutes, bounded and non-empty-only, shared across filter configs; concurrent identical requests share one provider fan-out.
 - Health stats reset on restart; the Render service is single-instance, so no cross-process coordination is needed.
