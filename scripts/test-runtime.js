@@ -218,6 +218,49 @@ async function main() {
     assert.strictEqual(loads, 2);
   });
 
+  await checkAsync('stream cache uses the partial ttl for partial results', async () => {
+    const clock = fakeClock();
+    const cache = createStreamCache({
+      ttlMs: 1000,
+      partialTtlMs: 100,
+      maxEntries: 2,
+      now: clock.now,
+    });
+    let loads = 0;
+    const loader = async () => {
+      loads += 1;
+      return {
+        value: [{ stream: { url: 'u' }, provider: { id: 'p' } }],
+        partial: true,
+      };
+    };
+    await cache.getOrLoad('k', loader);
+    await cache.getOrLoad('k', loader);
+    assert.strictEqual(loads, 1);
+    clock.advance(101);
+    await cache.getOrLoad('k', loader);
+    assert.strictEqual(loads, 2);
+  });
+
+  await checkAsync('stream cache does not store partial empty results', async () => {
+    const clock = fakeClock();
+    const cache = createStreamCache({
+      ttlMs: 1000,
+      partialTtlMs: 100,
+      maxEntries: 2,
+      now: clock.now,
+    });
+    let loads = 0;
+    const loader = async () => {
+      loads += 1;
+      return { value: [], partial: true };
+    };
+    await cache.getOrLoad('k', loader);
+    await cache.getOrLoad('k', loader);
+    assert.strictEqual(loads, 2);
+    assert.strictEqual(cache.stats().sets, 0);
+  });
+
   await checkAsync('stream cache does not store empty results', async () => {
     const cache = createStreamCache({ ttlMs: 1000, maxEntries: 2 });
     let loads = 0;
@@ -557,7 +600,10 @@ async function main() {
       snapshot: () => [],
       summary: () => ({ closed: 3, open: 0, halfOpen: 0, total: 3 }),
     };
-    const cache = { getOrLoad: (key, loader) => loader(), stats: () => ({}) };
+    const cache = {
+      getOrLoad: async (key, loader) => (await loader()).value,
+      stats: () => ({}),
+    };
     const fourk = provider('fourk', 2, async () => [
       { url: 'https://x/4k', quality: '4K' },
     ]);

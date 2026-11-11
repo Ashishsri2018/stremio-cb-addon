@@ -19,7 +19,7 @@ A high-performance, modular [Stremio](https://www.stremio.com/) stream and subti
 - **Production Resilience**:
   - In-memory circuit breakers with exponential backoff for failing or slow providers.
   - Real-time diagnostic metrics endpoint at `/stats`.
-  - 3-minute bounded LRU stream cache before per-user filtering.
+  - 3-minute bounded LRU stream cache before per-user filtering; partial results expire after 30 seconds and empty results are never cached.
   - Cinemeta + TMDB parallel metadata racing with a 24-hour LRU cache.
 - **Automated Upstream Sync**: Daily GitHub Actions workflow syncs and verifies scrapers from upstream `SA7ANI/cb-providers`.
 

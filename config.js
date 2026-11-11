@@ -20,6 +20,7 @@ module.exports = {
   breakerFailureThreshold: envInt('BREAKER_FAILURE_THRESHOLD', 3, 1),
   breakerCooldownMs: envInt('BREAKER_COOLDOWN_MS', 300000, 0),
   streamCacheTtlMs: envInt('STREAM_CACHE_TTL_MS', 180000, 0),
+  streamPartialCacheTtlMs: envInt('STREAM_PARTIAL_CACHE_TTL_MS', 30000, 0),
   streamCacheMaxEntries: envInt('STREAM_CACHE_MAX_ENTRIES', 500, 0),
   tmdbCacheMaxEntries: envInt('TMDB_CACHE_MAX_ENTRIES', 5000, 1),
   maxPerProviderStreams: envInt('MAX_PER_PROVIDER_STREAMS', 100, 1),

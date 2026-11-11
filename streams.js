@@ -74,6 +74,7 @@ function createCollector({
   }),
   cache = createStreamCache({
     ttlMs: config.streamCacheTtlMs,
+    partialTtlMs: config.streamPartialCacheTtlMs,
     maxEntries: config.streamCacheMaxEntries,
   }),
   providerTimeoutMs = config.providerTimeoutMs,
@@ -98,6 +99,7 @@ function createCollector({
       Math.min(providerTimeoutMs, deadline - now())
     );
     const providers = providersForFn(mediaType);
+    let partial = false;
     const results = await Promise.all(
       providers.map(async (provider) => {
         if (!breaker.attempt(provider.id)) return [];
@@ -129,6 +131,7 @@ function createCollector({
             error: err,
           });
           if (outcome === 'timeout') {
+            partial = true;
             logger.warn(`[streams] ${provider.id} timed out after ${timeoutMs}ms`);
           } else {
             logger.warn(`[streams] ${provider.id} failed: ${err.message}`);
@@ -138,7 +141,7 @@ function createCollector({
       })
     );
 
-    return dedupe(results);
+    return { value: dedupe(results), partial: partial || now() >= deadline };
   }
 
   async function collectStreams(contentId, type, season, episode, userConfig = DEFAULT_CONFIG) {

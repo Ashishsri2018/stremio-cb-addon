@@ -25,6 +25,13 @@ Conventions:
 
 ## Log
 
+### 2026-11-11 - Cache parity with Nuvio and Vega
+
+- Raw stream cache keeps only non-empty results; empty responses are never stored.
+- Timeout/deadline-truncated results use `STREAM_PARTIAL_CACHE_TTL_MS` (default `30000`); complete results keep `STREAM_CACHE_TTL_MS`.
+- `runProviders` reports whether the fan-out was truncated so the cache can pick the shorter TTL; `createStreamCache` reads `{ value, partial }` loaders while still accepting plain arrays.
+- Added runtime checks for partial TTL and partial-empty skip.
+
 ### 2026-11-11 - Decouple subtitle preference from stream filtering
 
 - `streamPassesFilters` now applies only resolution, size, and `keepUnknown`; it no longer drops video streams because of subtitle metadata.
