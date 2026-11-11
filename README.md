@@ -13,7 +13,7 @@ A high-performance, modular [Stremio](https://www.stremio.com/) stream and subti
 - **Configurable User Filters** (`/configure`):
   - **Resolution Ceiling**: Filter out streams above 4K, 1080p, 720p, or 480p.
   - **Size Limit**: Maximum file size in GB.
-  - **Subtitle Preferences**: Require specific subtitle tracks (English, Hindi, Tamil, Telugu, Malayalam, Japanese, or multi-audio).
+  - **Subtitle Preferences**: Filter tracks returned by the subtitles resource (English, Hindi, Tamil, Telugu, Malayalam, Japanese, or multi). Video streams are never hidden.
   - **Unknown Metadata**: Choose whether to keep or discard streams without detectable resolution/size.
 - **Dual Resource Support**: Advertises both `stream` and `subtitles` resources to Stremio.
 - **Production Resilience**:

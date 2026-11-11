@@ -6,6 +6,7 @@ const {
   decodeConfig,
   streamPassesFilters,
   normalizeSubtitles,
+  subtitleMatchesConfig,
   resolutionOf,
   sizeBytesOf,
 } = require('../filters');
@@ -137,42 +138,39 @@ check('subtitle normalization', () => {
   assert.strictEqual(tracks[0].id, 'https://x.test/en.vtt');
 });
 
-check('subtitle filter by language and presence', () => {
-  const hindi = { subtitles: [{ language: 'Hindi', url: 'https://x.test/hi.vtt' }] };
-  const english = { subtitles: [{ language: 'English', url: 'https://x.test/en.vtt' }] };
-  const textSubs = { title: 'Movie 1080p EngSubs' };
-  const none = { title: 'Movie 1080p' };
+check('subtitle preference filters tracks, not media streams', () => {
+  const englishTrack = { lang: 'en' };
+  const hindiTrack = { lang: 'hi' };
+  const multiTrack = { lang: 'multi' };
 
-  assert.strictEqual(streamPassesFilters(hindi, { ...DEFAULT_CONFIG, subtitles: 'hi' }), true);
-  assert.strictEqual(streamPassesFilters(hindi, { ...DEFAULT_CONFIG, subtitles: 'en' }), false);
-  assert.strictEqual(streamPassesFilters(english, { ...DEFAULT_CONFIG, subtitles: 'en' }), true);
+  assert.strictEqual(subtitleMatchesConfig(englishTrack, DEFAULT_CONFIG), true);
   assert.strictEqual(
-    streamPassesFilters(textSubs, { ...DEFAULT_CONFIG, subtitles: 'required' }),
+    subtitleMatchesConfig(englishTrack, { ...DEFAULT_CONFIG, subtitles: 'en' }),
     true
   );
-  assert.strictEqual(streamPassesFilters(none, { ...DEFAULT_CONFIG, subtitles: 'required' }), true);
   assert.strictEqual(
-    streamPassesFilters(none, { ...DEFAULT_CONFIG, subtitles: 'required', keepUnknown: false }),
+    subtitleMatchesConfig(hindiTrack, { ...DEFAULT_CONFIG, subtitles: 'en' }),
     false
   );
   assert.strictEqual(
-    streamPassesFilters(
-      { title: 'Movie Multi-Subs' },
-      { ...DEFAULT_CONFIG, subtitles: 'multi' }
-    ),
+    subtitleMatchesConfig(multiTrack, { ...DEFAULT_CONFIG, subtitles: 'multi' }),
+    true
+  );
+  assert.strictEqual(
+    subtitleMatchesConfig(englishTrack, { ...DEFAULT_CONFIG, subtitles: 'required' }),
     true
   );
 
-  const esubTitle = 'Fight.Club.2023.Hindi.720p.WEB-DL.DDP.5.1.E-Sub.- moviesdrives.com.mkv';
+  const mediaWithHindiOnly = {
+    title: 'Movie 720p',
+    subtitles: [{ language: 'Hindi', url: 'https://x.test/hi.vtt' }],
+  };
   assert.strictEqual(
-    streamPassesFilters({ title: esubTitle }, { ...DEFAULT_CONFIG, subtitles: 'en' }),
+    streamPassesFilters(mediaWithHindiOnly, { ...DEFAULT_CONFIG, subtitles: 'en' }),
     true
   );
   assert.strictEqual(
-    streamPassesFilters(
-      { title: 'Movie 720p E.Sub' },
-      { ...DEFAULT_CONFIG, subtitles: 'en' }
-    ),
+    streamPassesFilters({ title: 'Movie 720p E-Sub' }, { ...DEFAULT_CONFIG, subtitles: 'en' }),
     true
   );
 });

@@ -94,10 +94,9 @@
       </div>
 
       <div class="field">
-        <label for="subtitles">Subtitles</label>
+        <label for="subtitles">Subtitle language</label>
         <select id="subtitles">
           <option value="any">Any</option>
-          <option value="required">Require subtitles</option>
           <option value="en">English</option>
           <option value="hi">Hindi</option>
           <option value="ta">Tamil</option>
@@ -106,13 +105,13 @@
           <option value="ja">Japanese</option>
           <option value="multi">Multi</option>
         </select>
-        <span class="hint">Uses provider subtitle tracks and filename hints when available.</span>
+        <span class="hint">Filters tracks from the subtitles resource only. Video streams are never hidden.</span>
       </div>
 
       <div class="field check">
         <input id="keepUnknown" type="checkbox" checked>
         <label for="keepUnknown">Keep streams with unknown metadata
-          <span class="hint">Applies to unknown size, resolution, or subtitle information.</span>
+          <span class="hint">Applies to unknown size or resolution information.</span>
         </label>
       </div>
     </form>

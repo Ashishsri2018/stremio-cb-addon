@@ -16,10 +16,10 @@ server.js (Node >=18, Render)
   |     |-- lib/breaker.js: per-provider circuit breaker (3 failures -> 5 min open)
   |     |-- lib/stream-cache.js: 3 min raw result cache, bounded, coalesces requests
   |     |-- provider.getStreams(tmdbId, movie|tv, season, episode)
-  |     |-- dedupe by URL, then filters.js: user resolution/size/subtitle filters
+  |     |-- dedupe by URL, then filters.js: user resolution/size filters
   |     |-- format.js: normalize to Stremio streams (subtitles, videoSize, proxyHeaders, notWebReady, bingeGroup)
   |     `-- sort by quality rank, then provider health, then manifest order
-  |-- /subtitles: aggregates provider tracks from the same raw cache, deduped by URL
+  |-- /subtitles: aggregates provider tracks from the same raw cache, deduped by URL, then filters by the subtitle language preference
   |-- /stats and /health: circuit, cache, and uptime telemetry
   v
 { "streams": [ ... ] } | { "subtitles": [ ... ] }
@@ -53,7 +53,7 @@ Subtitle routes:
 - Movie: `/subtitles/movie/tt0137523.json` or `/subtitles/movie/tmdb:550.json`
 - Series episode: `/subtitles/series/tt0944947:1:1.json` or `/subtitles/series/tmdb:1399:1:1.json`
 - The optional Stremio extras segment (`/videoHash=...&videoSize=...&filename=....json`) is accepted and ignored.
-- Response is `{ "subtitles": [{ "id", "url", "lang" }] }`, aggregated from every provider stream for that title and deduped by URL. It shares the 3-minute raw stream cache and does not apply user filters.
+- Response is `{ "subtitles": [{ "id", "url", "lang" }] }`, aggregated from every provider stream for that title and deduped by URL. It shares the 3-minute raw stream cache. Only the `subtitles` language preference applies here; resolution, size, and unknown-metadata filters affect streams only.
 - Series without season/episode returns `200 {"subtitles":[]}`.
 - Nuvio Mobile ignores `subtitles` embedded in stream objects and only queries addons that advertise a `subtitles` resource, so this endpoint is required for those clients. Stremio and Nuvio TV consume both paths.
 
@@ -98,7 +98,7 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 | `providers.js` | Reads vendored manifest, skips disabled ids, requires provider modules, type filtering |
 | `cinemeta.js` | IMDb -> TMDB resolution and caching |
 | `streams.js` | Provider orchestration, timeouts, dedupe, stream filtering/quality sorting, subtitle aggregation |
-| `filters.js` | URL config encoding/decoding, resolution/size detection, subtitle normalization, stream filtering |
+| `filters.js` | URL config encoding/decoding, resolution/size detection, subtitle normalization/filtering, stream filtering |
 | `format.js` | Provider stream -> Stremio stream conversion |
 | `lib/url-classifier.js` | Classifies URLs into direct video streams vs web pages / embeds / archives |
 | `lib/lru.js` | Bounded TTL/LRU cache used by metadata and stream caches |
@@ -167,8 +167,8 @@ Filters are encoded in the addon URL as base64url JSON and applied per request o
 | --- | --- | --- |
 | `maxRes` | `any`, `2160`, `1080`, `720`, `480` | Hides streams above the ceiling. Resolution comes from `quality` or title/description text. |
 | `maxSizeGB` | number or `null` | Hides streams larger than the limit. Size comes from provider `size` or `GB`/`MB` text. |
-| `keepUnknown` | boolean, default `true` | When false, streams without detectable resolution/size/subtitle metadata are dropped. |
-| `subtitles` | `any`, `required`, `en`, `hi`, `ta`, `te`, `ml`, `ja`, `multi` | Matches provider subtitle tracks first, then filename hints (e.g. `E-Sub`). Streams with no subtitle info follow `keepUnknown`. |
+| `keepUnknown` | boolean, default `true` | When false, streams without detectable resolution or size metadata are dropped. |
+| `subtitles` | `any`, `required`, `en`, `hi`, `ta`, `te`, `ml`, `ja`, `multi` | Filters tracks returned by the `/subtitles` resource by language. Never hides video streams. `required` is accepted for backward compatibility and behaves like `any`. |
 
 `/configure` writes these values into the manifest URL. Users switch filters by installing a new URL.
 
@@ -191,7 +191,7 @@ Filters are encoded in the addon URL as base64url JSON and applied per request o
 - **Datacenter IP blocking.** Some upstream sites reject cloud IPs. The breaker catches timeouts/throws, but most providers swallow blocked responses and return empty, so `/stats` empty counts are the signal; fewer providers respond on Render than locally.
 - **Signed URLs expire.** Raw results are cached for at most 3 minutes; responses are otherwise bounded by the 20s/25s timeouts.
 - **All circuits open.** A request can return no new streams until a cooldown probe succeeds; cached entries still serve if present.
-- **Filtering is opt-in.** Plain routes only sort by quality; configured routes apply resolution/size/subtitle filters. Metadata is provider-supplied, so unknown values are controlled by `keepUnknown`.
+- **Filtering is opt-in.** Plain routes only sort by quality; configured routes apply resolution/size filters to streams and the subtitle language preference to `/subtitles`. Metadata is provider-supplied, so unknown stream values are controlled by `keepUnknown`.
 - **Upstream drift.** A new provider may require a new npm dependency; the sync workflow's verification fails before committing in that case, so the fix is to add the dependency and re-run the sync.
 
 ## Maintenance

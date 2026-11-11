@@ -3,7 +3,12 @@ const { getRegistry, providersFor } = require('./providers');
 const { tmdbIdOf } = require('./content-id');
 const cinemeta = require('./cinemeta');
 const { isWebPage, qualityRank, toStremioStream } = require('./format');
-const { DEFAULT_CONFIG, normalizeSubtitles, streamPassesFilters } = require('./filters');
+const {
+  DEFAULT_CONFIG,
+  normalizeSubtitles,
+  streamPassesFilters,
+  subtitleMatchesConfig,
+} = require('./filters');
 const { createBreaker } = require('./lib/breaker');
 const { createStreamCache } = require('./lib/stream-cache');
 const { TimeoutError, withTimeout } = require('./lib/timeout');
@@ -165,7 +170,7 @@ function createCollector({
     return streams.slice(0, maxTotalStreams);
   }
 
-  async function collectSubtitles(contentId, type, season, episode) {
+  async function collectSubtitles(contentId, type, season, episode, userConfig = DEFAULT_CONFIG) {
     const key = streamKey(type, contentId, season, episode);
     const raw = await cache.getOrLoad(key, () =>
       runProviders(contentId, type, season, episode)
@@ -176,6 +181,7 @@ function createCollector({
     for (const item of raw) {
       for (const track of normalizeSubtitles(item.stream.subtitles)) {
         if (seen.has(track.url)) continue;
+        if (!subtitleMatchesConfig(track, userConfig)) continue;
         seen.add(track.url);
         subtitles.push(track);
       }

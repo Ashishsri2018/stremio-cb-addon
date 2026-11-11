@@ -17,13 +17,21 @@ Conventions:
 - IDs: manifest advertises `tt` and `tmdb:`; `tmdb:` ids go straight to providers, `tt` ids resolve via Cinemeta/TMDB
 - Stream classification: `lib/url-classifier.js` categorizes stream URLs into direct video streams vs web pages / embeds / archives (`.zip`). Web pages are mapped to Stremio `externalUrl` (preventing player errors) and sorted behind direct streams; anti-bot blocker links (`/slowdown`) are dropped at ingestion
 - Stream limits & deduplication: each scraper is capped at 100 streams (`MAX_PER_PROVIDER_STREAMS`), duplicates to the same file are canonicalized and removed (`normalizeStreamKey`), and the global stream response is capped at 1000 streams (`MAX_TOTAL_STREAMS`)
-- Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
+- Filters: `/configure` builds a base64url config URL with max resolution, max size, and keep-unknown for streams; the subtitle language preference filters only the `/subtitles` resource and never hides video streams
 - Manifest advertises both `stream` and `subtitles` resources; `/subtitles/{type}/{id}` aggregates provider tracks from the shared raw cache
 - TMDB fallback: user-supplied key stored as a hosting environment variable / secret (not in git); providers still use their embedded keys
 - Runtime resilience: per-provider circuit breaker + `/stats`; Cinemeta/TMDB raced in parallel; raw stream results cached 3 min
 - Keep-alive: `.github/workflows/keep-alive.yml` pings `/health` (via `HEALTH_CHECK_URL` secret) every 10 min via four daily 5h50m jobs
 
 ## Log
+
+### 2026-11-11 - Decouple subtitle preference from stream filtering
+
+- `streamPassesFilters` now applies only resolution, size, and `keepUnknown`; it no longer drops video streams because of subtitle metadata.
+- `collectSubtitles` accepts the user config and filters tracks with `subtitleMatchesConfig` by language (`any` and legacy `required` keep all tracks; `multi` keeps multi-language tracks).
+- `/configure` labels the field "Subtitle language" and removes "Require subtitles"; existing `required` configs remain valid for backward compatibility.
+- Updated filter and runtime tests: streams with Hindi-only tracks survive `subtitles=en`, while the subtitles response returns only English tracks.
+- Supersedes the earlier E-Sub stream-level workaround; filename hints no longer hide media links.
 
 ### 2026-11-11 - Fix MoviesDrive disappearing under `subtitles=en`
 

@@ -50,7 +50,7 @@ function manifestFor(req) {
     version: '1.0.0',
     name: config.addonName,
     description:
-      'Multi-provider stream addon powered by the CB Providers fleet (MoviesDrive, 4KHDHub, HDHub4u, VegaMovies, NetMirror, anime providers and more). Resolves content from IMDb or TMDB IDs and serves provider subtitle tracks. Configure resolution, size, and subtitle filters at /configure.',
+      'Multi-provider stream addon powered by the CB Providers fleet (MoviesDrive, 4KHDHub, HDHub4u, VegaMovies, NetMirror, anime providers and more). Resolves content from IMDb or TMDB IDs and serves provider subtitle tracks. Configure resolution and size filters plus the subtitle language at /configure.',
     logo: `${baseUrl(req)}/logo.png`,
     types: ['movie', 'series'],
     resources: ['stream', 'subtitles'],
@@ -224,7 +224,13 @@ const server = http.createServer(async (req, res) => {
   try {
     const label = season === null ? contentId : `${contentId} S${season}E${episode}`;
     if (route.kind === 'subtitles') {
-      const subtitles = await collectSubtitles(contentId, type, season, episode);
+      const subtitles = await collectSubtitles(
+        contentId,
+        type,
+        season,
+        episode,
+        userConfig
+      );
       console.log(
         `[server] subtitles ${type} ${label} -> ${subtitles.length} tracks (${Date.now() - started}ms)`
       );

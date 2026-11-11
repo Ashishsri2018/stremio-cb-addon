@@ -125,33 +125,12 @@ function normalizeSubtitles(subtitles) {
   return result;
 }
 
-const SUBTITLE_WORD = /\b(subs?|subtitles?)\b|(?:eng|esub|hin|tamil|telugu|malayalam|japanese|multi)[- ]?subs?/i;
-const LANG_TEXT = {
-  en: 'eng(?:lish)?',
-  hi: 'hin(?:di)?',
-  ta: 'tam(?:il)?',
-  te: 'tel(?:ugu)?',
-  ml: 'mal(?:ayalam)?',
-  ja: 'jap(?:anese)?|jpn',
-};
-
-function hasSubtitleText(stream, code) {
-  const text = [stream.title, stream.description, stream.name]
-    .filter((value) => typeof value === 'string' && value.length > 0)
-    .join(' ');
-  if (!text) return false;
-
-  if (code === 'required') return SUBTITLE_WORD.test(text);
-  if (code === 'multi') return /multi[- ]?(?:subs?|subtitles?)/i.test(text);
-  if (code === 'en' && /\be[-. ]?subs?\b/i.test(text)) return true;
-
-  const lang = LANG_TEXT[code];
-  if (!lang) return false;
-  const pattern = new RegExp(
-    `(?:${lang})[^a-z]{0,24}(?:subs?|subtitles?)|(?:subs?|subtitles?)[^a-z]{0,24}(?:${lang})`,
-    'i'
-  );
-  return pattern.test(text);
+function subtitleMatchesConfig(track, config) {
+  const wanted = (config && config.subtitles) || 'any';
+  if (wanted === 'any' || wanted === 'required') return true;
+  if (!track || typeof track.lang !== 'string') return false;
+  if (wanted === 'multi') return track.lang === 'multi';
+  return track.lang === wanted;
 }
 
 function streamPassesFilters(stream, config) {
@@ -176,25 +155,6 @@ function streamPassesFilters(stream, config) {
     }
   }
 
-  if (cfg.subtitles !== 'any') {
-    const tracks = normalizeSubtitles(stream.subtitles);
-    const codes = new Set(tracks.map((track) => track.lang));
-
-    let matches = false;
-    if (cfg.subtitles === 'required') {
-      matches = tracks.length > 0 || hasSubtitleText(stream, 'required');
-    } else if (cfg.subtitles === 'multi') {
-      matches = codes.has('multi') || hasSubtitleText(stream, 'multi');
-    } else {
-      matches = codes.has(cfg.subtitles) || hasSubtitleText(stream, cfg.subtitles);
-    }
-
-    if (!matches) {
-      const knownSubtitles = tracks.length > 0 || hasSubtitleText(stream, 'required');
-      if (knownSubtitles || !cfg.keepUnknown) return false;
-    }
-  }
-
   return true;
 }
 
@@ -205,6 +165,7 @@ module.exports = {
   decodeConfig,
   streamPassesFilters,
   normalizeSubtitles,
+  subtitleMatchesConfig,
   resolutionOf,
   sizeBytesOf,
 };

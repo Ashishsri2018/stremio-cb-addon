@@ -502,10 +502,22 @@ async function main() {
     assert.strictEqual(subtitles[1].lang, 'hi');
     assert.strictEqual(subtitles[2].lang, 'ja');
 
-    const streams = await collector.collectStreams('tt7', 'movie', null, null, DEFAULT_CONFIG);
+    const englishOnly = await collector.collectSubtitles('tt7', 'movie', null, null, {
+      ...DEFAULT_CONFIG,
+      subtitles: 'en',
+    });
+    assert.deepStrictEqual(
+      englishOnly.map((track) => track.url),
+      ['https://sub/english.srt']
+    );
+
+    const streams = await collector.collectStreams('tt7', 'movie', null, null, {
+      ...DEFAULT_CONFIG,
+      subtitles: 'en',
+    });
     assert.strictEqual(streams.length, 3);
     assert.strictEqual(calls, 1);
-    assert.strictEqual(cache.stats().hits, 1);
+    assert.strictEqual(cache.stats().hits, 2);
   });
 
   await checkAsync('collector skips open circuits without invoking providers', async () => {
