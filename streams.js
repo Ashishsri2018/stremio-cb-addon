@@ -2,22 +2,26 @@ const config = require('./config');
 const { getRegistry, providersFor } = require('./providers');
 const { tmdbIdOf } = require('./content-id');
 const cinemeta = require('./cinemeta');
-const { qualityRank, toStremioStream } = require('./format');
+const { isWebPage, qualityRank, toStremioStream } = require('./format');
 const { DEFAULT_CONFIG, normalizeSubtitles, streamPassesFilters } = require('./filters');
 const { createBreaker } = require('./lib/breaker');
 const { createStreamCache } = require('./lib/stream-cache');
 const { TimeoutError, withTimeout } = require('./lib/timeout');
+
+const BLOCKER_URL_PATTERN = /\/slowdown\b/i;
 
 function streamKey(type, contentId, season, episode) {
   return `${type}:${contentId}:${season ?? ''}:${episode ?? ''}`;
 }
 
 function validStream(stream) {
-  return (
-    stream &&
-    ((typeof stream.url === 'string' && stream.url.length > 0) ||
-      (typeof stream.infoHash === 'string' && stream.infoHash.length > 0))
-  );
+  if (!stream) return false;
+  const targetUrl = stream.url || stream.externalUrl;
+  if (typeof targetUrl === 'string' && targetUrl.length > 0) {
+    if (BLOCKER_URL_PATTERN.test(targetUrl)) return false;
+    return true;
+  }
+  return typeof stream.infoHash === 'string' && stream.infoHash.length > 0;
 }
 
 function dedupe(results) {
@@ -26,7 +30,10 @@ function dedupe(results) {
 
   for (const list of results) {
     for (const item of list) {
-      const key = item.stream.url || `${item.stream.infoHash}:${item.stream.fileIdx || 0}`;
+      const key =
+        item.stream.url ||
+        item.stream.externalUrl ||
+        `${item.stream.infoHash}:${item.stream.fileIdx || 0}`;
       if (seen.has(key)) continue;
       seen.add(key);
       deduped.push(item);
@@ -122,6 +129,10 @@ function createCollector({
       .filter((item) => streamPassesFilters(item.stream, userConfig));
 
     filtered.sort((a, b) => {
+      const aIsExt = isWebPage(a.stream.url || a.stream.externalUrl, a.stream) ? 1 : 0;
+      const bIsExt = isWebPage(b.stream.url || b.stream.externalUrl, b.stream) ? 1 : 0;
+      if (aIsExt !== bIsExt) return aIsExt - bIsExt;
+
       const byQuality = a.rank - b.rank;
       if (byQuality !== 0) return byQuality;
       const byHealth = breaker.score(b.provider.id) - breaker.score(a.provider.id);

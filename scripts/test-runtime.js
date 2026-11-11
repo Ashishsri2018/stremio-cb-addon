@@ -580,6 +580,27 @@ async function main() {
     assert.strictEqual(stats.providers[0].skipped, 1);
   });
 
+  await checkAsync('collector prioritizes direct streams over external web pages and drops blockers', async () => {
+    const mixed = provider('mixed', 0, async () => [
+      { url: 'https://screenscape.me/embed?tmdb=1', quality: '4k', title: '4K Embed' },
+      { url: 'https://cdn.test/stream.m3u8', quality: '1080p', title: '1080p Direct' },
+      { externalUrl: 'https://moviesapi.to/movie/1', quality: '1080p', title: '1080p External' },
+      { url: 'https://st.111477.xyz/slowdown', quality: '1080p', title: 'Spammy IP' },
+    ]);
+    const collector = makeCollector({ providers: [mixed] });
+    const streams = await collector.collectStreams('tt-mixed', 'movie', null, null);
+
+    assert.strictEqual(streams.length, 3);
+    assert.strictEqual(streams[0].url, 'https://cdn.test/stream.m3u8');
+    assert.strictEqual(streams[0].externalUrl, undefined);
+
+    assert.strictEqual(streams[1].externalUrl, 'https://screenscape.me/embed?tmdb=1');
+    assert.strictEqual(streams[1].url, undefined);
+
+    assert.strictEqual(streams[2].externalUrl, 'https://moviesapi.to/movie/1');
+    assert.strictEqual(streams[2].url, undefined);
+  });
+
   await checkAsync('runtime stats include circuit, cache, and metadata summaries', async () => {
     const source = provider('a', 0, async () => [
       { url: 'https://x/a', quality: '1080p' },

@@ -1,4 +1,5 @@
 const { normalizeSubtitles, sizeBytesOf } = require('./filters');
+const { isWebPage } = require('./lib/url-classifier');
 
 const QUALITY_PATTERNS = [
   [/\b(4k|uhd|2160p?)\b/i, 0],
@@ -19,38 +20,41 @@ function qualityRank(stream) {
 function toStremioStream(stream, provider) {
   if (!stream) return null;
 
-  const hasUrl = typeof stream.url === 'string' && stream.url.length > 0;
+  const targetUrl = stream.url || stream.externalUrl;
   const hasInfoHash = typeof stream.infoHash === 'string' && stream.infoHash.length > 0;
-  if (!hasUrl && !hasInfoHash) return null;
+  if (!targetUrl && !hasInfoHash) return null;
 
   const out = {
     name: provider.name,
     title: stream.description || stream.title || stream.name || 'Stream',
   };
 
-  if (hasUrl) {
-    out.url = stream.url;
+  if (targetUrl) {
+    if (isWebPage(targetUrl, stream)) {
+      out.externalUrl = targetUrl;
+    } else {
+      out.url = targetUrl;
+      const hints = {};
+      const videoSize = sizeBytesOf(stream);
+      if (videoSize != null) hints.videoSize = videoSize;
+      if (stream.headers && typeof stream.headers === 'object' && Object.keys(stream.headers).length > 0) {
+        hints.proxyHeaders = { request: stream.headers };
+        hints.notWebReady = true;
+      }
+      if (stream.behaviorHints && stream.behaviorHints.bingeGroup) {
+        hints.bingeGroup = stream.behaviorHints.bingeGroup;
+      }
+      if (Object.keys(hints).length > 0) out.behaviorHints = hints;
+
+      const subtitles = normalizeSubtitles(stream.subtitles);
+      if (subtitles.length > 0) out.subtitles = subtitles;
+    }
   } else {
     out.infoHash = stream.infoHash;
     if (stream.fileIdx != null) out.fileIdx = stream.fileIdx;
   }
 
-  const subtitles = normalizeSubtitles(stream.subtitles);
-  if (subtitles.length > 0) out.subtitles = subtitles;
-
-  const hints = {};
-  const videoSize = sizeBytesOf(stream);
-  if (videoSize != null) hints.videoSize = videoSize;
-  if (stream.headers && typeof stream.headers === 'object' && Object.keys(stream.headers).length > 0) {
-    hints.proxyHeaders = { request: stream.headers };
-    hints.notWebReady = true;
-  }
-  if (stream.behaviorHints && stream.behaviorHints.bingeGroup) {
-    hints.bingeGroup = stream.behaviorHints.bingeGroup;
-  }
-  if (Object.keys(hints).length > 0) out.behaviorHints = hints;
-
   return out;
 }
 
-module.exports = { qualityRank, toStremioStream };
+module.exports = { isWebPage, qualityRank, toStremioStream };

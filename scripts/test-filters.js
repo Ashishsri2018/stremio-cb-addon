@@ -9,7 +9,7 @@ const {
   resolutionOf,
   sizeBytesOf,
 } = require('../filters');
-const { toStremioStream } = require('../format');
+const { toStremioStream, isWebPage } = require('../format');
 const { parseContentId, toContentId, tmdbIdOf } = require('../content-id');
 
 function check(name, fn) {
@@ -164,7 +164,7 @@ check('subtitle filter by language and presence', () => {
   );
 });
 
-check('formatter keeps subtitles and size hint', () => {
+check('formatter keeps subtitles and size hint for direct streams', () => {
   const out = toStremioStream(
     {
       url: 'https://x.test/stream.m3u8',
@@ -174,11 +174,85 @@ check('formatter keeps subtitles and size hint', () => {
     },
     { name: 'TestProvider', order: 0 }
   );
+  assert.strictEqual(out.url, 'https://x.test/stream.m3u8');
+  assert.strictEqual(out.externalUrl, undefined);
   assert.deepStrictEqual(out.subtitles, [
     { id: 'https://x.test/en.vtt', url: 'https://x.test/en.vtt', lang: 'en' },
   ]);
   assert.strictEqual(out.behaviorHints.videoSize, Math.round(1.5 * 1024 ** 3));
   assert.strictEqual(out.name, 'TestProvider');
+});
+
+check('web page detection distinguishes video streams from web pages and embeds', () => {
+  // Direct video streams
+  assert.strictEqual(isWebPage('https://cdn.test/video.m3u8'), false);
+  assert.strictEqual(isWebPage('https://cdn.test/video.mp4?token=123'), false);
+  assert.strictEqual(isWebPage('https://cdn.test/video.mkv'), false);
+  assert.strictEqual(isWebPage('https://cdn.test/video.mpd'), false);
+  assert.strictEqual(
+    isWebPage('https://b6a3a2c1.r2.cloudflarestorage.com/hub/file.mkv?X-Amz=1'),
+    false
+  );
+  assert.strictEqual(
+    isWebPage('https://video-downloads.googleusercontent.com/ADGPM2nyQWdv'),
+    false
+  );
+  assert.strictEqual(isWebPage('https://pixeldrain.com/api/file/abc123'), false);
+
+  // Web pages & embeds
+  assert.strictEqual(isWebPage('https://rubystm.com/e/abc123.html'), true);
+  assert.strictEqual(isWebPage('https://screenscape.me/embed?tmdb=1396'), true);
+  assert.strictEqual(isWebPage('https://peachify.top/embed/tv/1396/1/1'), true);
+  assert.strictEqual(isWebPage('https://web.nxsha.app/embed/tv/1396/1/1'), true);
+  assert.strictEqual(isWebPage('https://filesforever.link/embed/abt92w4'), true);
+  assert.strictEqual(isWebPage('https://moviesapi.to/movie/27205'), true);
+  assert.strictEqual(isWebPage('https://hubcloud.ist/tg/go?id=xyz'), true);
+  assert.strictEqual(isWebPage('https://cdn.test/archive.zip'), true);
+  assert.strictEqual(isWebPage('https://cdn.test/archive.rar'), true);
+  assert.strictEqual(
+    isWebPage('https://custom.site/watch', { server: 'Ruby Stream [Embed]' }),
+    true
+  );
+  assert.strictEqual(
+    isWebPage('https://custom.site/watch', { externalUrl: 'https://custom.site/watch' }),
+    true
+  );
+});
+
+check('formatter maps web pages and embeds to externalUrl and omits url', () => {
+  const embed = toStremioStream(
+    {
+      url: 'https://screenscape.me/embed?tmdb=1396&type=tv&s=1&e=1',
+      title: 'Breaking Bad S01E01 1080p',
+      size: '1.5 GB',
+      headers: { Referer: 'https://screenscape.me' },
+    },
+    { name: 'MultiMovies', order: 1 }
+  );
+  assert.strictEqual(embed.externalUrl, 'https://screenscape.me/embed?tmdb=1396&type=tv&s=1&e=1');
+  assert.strictEqual(embed.url, undefined);
+  assert.strictEqual(embed.behaviorHints, undefined);
+  assert.strictEqual(embed.name, 'MultiMovies');
+
+  const zip = toStremioStream(
+    {
+      url: 'https://workers.dev/Stranger.Things.S01E01.mkv.zip',
+      title: 'Stranger Things S01E01 [4KHDHub]',
+    },
+    { name: '4KHDHub', order: 2 }
+  );
+  assert.strictEqual(zip.externalUrl, 'https://workers.dev/Stranger.Things.S01E01.mkv.zip');
+  assert.strictEqual(zip.url, undefined);
+
+  const providerTagged = toStremioStream(
+    {
+      externalUrl: 'https://moviesapi.to/movie/27205',
+      title: 'Inception 1080p',
+    },
+    { name: 'RedFlix', order: 3 }
+  );
+  assert.strictEqual(providerTagged.externalUrl, 'https://moviesapi.to/movie/27205');
+  assert.strictEqual(providerTagged.url, undefined);
 });
 
 console.log('filter tests passed');

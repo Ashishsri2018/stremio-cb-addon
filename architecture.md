@@ -65,18 +65,21 @@ Configured routes (settings encoded as base64url JSON in the path, no server-sid
 - `GET /configure` serves the HTML builder that generates these URLs and a `stremio://` install link. The file is read once at startup and served from memory.
 - A path segment that does not decode to a JSON object returns `400 {"error":"Invalid configuration"}`; plain routes use permissive defaults.
 
-Stream object mapping (format.js):
+Stream object mapping (format.js & lib/url-classifier.js):
 
 - `name` = provider display name from the vendored manifest.
 - `title` = provider `description` / `title` / `name`.
-- `url` passed through (HTTP(S) or magnet).
+- Classification: URLs are classified via `lib/url-classifier.js`:
+  - **Direct video streams**: assigned to `out.url` (e.g. `.m3u8`, `.mpd`, `.mp4`, `.mkv`, Google UserContent, Cloudflare R2).
+  - **Web pages and embeds**: assigned to `out.externalUrl` (e.g. `/embed/`, `.html`, `moviesapi.to`, `rubystm.com`, `screenscape.me`, or `.zip` archives). `out.url`, `proxyHeaders`, and `videoSize` are omitted so Stremio's native player is not invoked on HTML.
+  - **Blocker URLs**: Rate-limit pages such as `st.111477.xyz/slowdown` are dropped at ingestion in `streams.js`.
 - `infoHash` + `fileIdx` used when the provider returns no URL.
-- Provider `headers` become `behaviorHints.proxyHeaders.request` with `notWebReady: true`.
-- Provider `behaviorHints.bingeGroup` is preserved.
+- Provider `headers` become `behaviorHints.proxyHeaders.request` with `notWebReady: true` for direct streams.
+- Provider `behaviorHints.bingeGroup` is preserved for direct streams.
 - Provider `subtitles` tracks are normalized to Stremio subtitle objects (`{id,url,lang}`) from `url`/`file`/`src` and `lang`/`language`/`label`.
-- Provider `size` or size text in the title becomes `behaviorHints.videoSize`.
+- Provider `size` or size text in the title becomes `behaviorHints.videoSize` for direct streams.
 
-Results are ordered by quality rank, then provider health (Laplace-smoothed `ok/calls`), then manifest order.
+Results are ordered direct in-app video streams first, followed by external web page links. Within each tier, items are ordered by quality rank, then provider health (Laplace-smoothed `ok/calls`), then manifest order.
 
 Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) keyed by `type:contentId:season:episode`, before user filters and formatting, so one entry serves every filter configuration and the subtitle endpoint. The cache is bounded (`STREAM_CACHE_MAX_ENTRIES`), stores only non-empty results, and coalesces concurrent identical requests. URLs are time-signed, so the TTL stays short and can be disabled with `0`.
 
@@ -92,6 +95,7 @@ Raw provider results are cached in memory for 3 minutes (`STREAM_CACHE_TTL_MS`) 
 | `streams.js` | Provider orchestration, timeouts, dedupe, stream filtering/quality sorting, subtitle aggregation |
 | `filters.js` | URL config encoding/decoding, resolution/size detection, subtitle normalization, stream filtering |
 | `format.js` | Provider stream -> Stremio stream conversion |
+| `lib/url-classifier.js` | Classifies URLs into direct video streams vs web pages / embeds / archives |
 | `lib/lru.js` | Bounded TTL/LRU cache used by metadata and stream caches |
 | `lib/breaker.js` | Per-provider circuit breaker and health counters |
 | `lib/stream-cache.js` | 3-minute raw stream cache with in-flight coalescing |
@@ -163,13 +167,13 @@ Filters are encoded in the addon URL as base64url JSON and applied per request o
 
 ## Deployment and CI/CD
 
-- Render web service, free plan, Singapore: `https://stremio-cb-addon.onrender.com`
+- Deployable to any Node.js hosting platform (e.g., Render free/starter web service: `https://<your-service>.onrender.com`).
 - Build: `npm ci`; start: `node server.js`; health check: `/health`.
-- The live service stores a user-supplied `TMDB_API_KEY` as an encrypted Render env var (never committed). It is used only by the Cinemeta fallback resolver; provider-embedded TMDB keys are unaffected.
+- The live service can store a user-supplied `TMDB_API_KEY` as an environment variable (never committed). It is used only by the Cinemeta fallback resolver; provider-embedded TMDB keys are unaffected.
 - CI (`.github/workflows/ci.yml`): on push/PR, runs `npm ci`, ESLint (`npm run lint`), syntax check (root + `lib/`), provider registry verification, dependency audit gate (`scripts/check-audit.js`), unit tests (`npm test`: filters + runtime), and HTTP smoke tests including `/health`, `/stats`, `/configure`, and configured routes.
 - Node is pinned to 22 via `.nvmrc` for both CI and Render.
 - Sync (`.github/workflows/sync-upstream.yml`): daily at 03:17 UTC (also manual). It vendors the latest upstream providers (including disabled ones), verifies the active provider set, and commits only when valid. The resulting commit triggers CI.
-- Keep-alive (`.github/workflows/keep-alive.yml`): four daily 5h50m jobs ping `/health` every 10 minutes so the free instance does not sleep; this shape costs ~1,400 Actions minutes/month instead of ~4,320 for a separate 10-minute cron.
+- Keep-alive (`.github/workflows/keep-alive.yml`): four daily 5h50m jobs ping `/health` (via repository secret `HEALTH_CHECK_URL`) every 10 minutes so free instances do not sleep without burning unnecessary Actions minutes.
 - Docs-only commits use `[skip ci]` (plus `[skip render]`) to avoid unnecessary builds.
 - Render uses `autoDeployTrigger: checksPass`, so deploys start only after the CI checks for the commit pass.
 - The audit gate allowlists four GHSA advisories reachable only through `cheerio-without-node-native`'s vendored `jsdom 7`/`request` tree, which has no fix; any new high/critical advisory fails CI.

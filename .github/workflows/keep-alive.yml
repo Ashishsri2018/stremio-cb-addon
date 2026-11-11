@@ -2,10 +2,10 @@ name: Keep Render awake
 
 on:
   schedule:
-    # Render free instances sleep after 15 minutes idle. Four 5h50m jobs
-    # cover the day with a 10-minute ping cadence and stay under the
-    # 2,000 free Actions minutes for private repos (a separate run every
-    # 10 minutes would bill ~4,320 minutes/month).
+    # Render free instances sleep after 15 minutes idle. If HEALTH_CHECK_URL
+    # is set as a repository secret or env var, four 5h50m jobs cover the day
+    # with a 10-minute ping cadence to keep the service warm without burning
+    # excessive Actions minutes.
     - cron: '17 1,7,13,19 * * *'
   workflow_dispatch:
 
@@ -22,7 +22,11 @@ jobs:
     steps:
       - name: Ping /health every 10 minutes
         run: |
-          url="https://stremio-cb-addon.onrender.com/health"
+          url="${HEALTH_CHECK_URL:-${{ secrets.HEALTH_CHECK_URL }}}"
+          if [ -z "$url" ]; then
+            echo "HEALTH_CHECK_URL secret is not set; skipping keep-alive ping."
+            exit 0
+          fi
           end=$(( $(date +%s) + 21000 ))
           failures=0
 

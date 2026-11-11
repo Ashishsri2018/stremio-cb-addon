@@ -8,22 +8,35 @@ Conventions:
 - Docs-only commits: `git commit -m "docs: ... [skip ci] [skip render]"`.
 - Keep the "Current state" section short and current.
 
-## Current state (2026-11-10)
+## Current state (2026-11-11)
 
-- Repo: `https://github.com/Ashishsri2018/stremio-cb-addon` (private, GPL-3.0)
-- Live addon: `https://stremio-cb-addon.onrender.com` (install with `/manifest.json`)
-- Render service: `srv-dbo0nv3rjlhs73a3qavg`, free plan, Singapore, health `/health`
+- Repo: `https://github.com/Ashishsri2018/stremio-cb-addon` (public, GPL-3.0)
+- Deployment: Render web service (free tier, `/health` endpoint)
 - Providers: 28 vendored from `SA7ANI/cb-providers`, 27 active (Torrentio disabled in addon code but kept for daily sync), upstream SHA `e66d80656b4b1ec79aa391cb5a864ae98de36fa1`
 - CI/CD: GitHub Actions CI on push; upstream sync daily 03:17 UTC; Render auto-deploy after CI checks pass
-- Verified live on 2026-11-10: `/health` ok with 27 providers; `tt0137523` returned 53 streams, `tmdb:550` returned 54 streams, series `tt0944947:1:1` returned 31 streams; all 27 circuits closed/healthy
 - IDs: manifest advertises `tt` and `tmdb:`; `tmdb:` ids go straight to providers, `tt` ids resolve via Cinemeta/TMDB
+- Stream classification: `lib/url-classifier.js` categorizes stream URLs into direct video streams vs web pages / embeds / archives (`.zip`). Web pages are mapped to Stremio `externalUrl` (preventing player errors) and sorted behind direct streams; anti-bot blocker links (`/slowdown`) are dropped at ingestion
 - Filters: `/configure` builds a base64url config URL with max resolution, max size, keep-unknown, and subtitle filters
 - Manifest advertises both `stream` and `subtitles` resources; `/subtitles/{type}/{id}` aggregates provider tracks from the shared raw cache
-- TMDB fallback: user-supplied key stored as a Render secret (not in git); providers still use their embedded keys
+- TMDB fallback: user-supplied key stored as a hosting environment variable / secret (not in git); providers still use their embedded keys
 - Runtime resilience: per-provider circuit breaker + `/stats`; Cinemeta/TMDB raced in parallel; raw stream results cached 3 min
-- Keep-alive: `.github/workflows/keep-alive.yml` pings `/health` every 10 min via four daily 5h50m jobs (~1,400 Actions min/month)
+- Keep-alive: `.github/workflows/keep-alive.yml` pings `/health` (via `HEALTH_CHECK_URL` secret) every 10 min via four daily 5h50m jobs
 
 ## Log
+
+### 2026-11-11 - Sanitize secrets and live domain for public repository release
+
+- Sanitized repository for public release: removed hardcoded live domain URLs and Render service IDs from documentation and GitHub Actions workflows.
+- Updated `.github/workflows/keep-alive.yml` to read `HEALTH_CHECK_URL` from repository secrets or env vars with a graceful skip exit code when unset.
+- Updated `.gitignore` to ignore `.env` and `.env.*`.
+- Added public `README.md` documenting installation, configuration, provider support, local development, and Render deployment.
+
+### 2026-11-11 - Web page detection, externalUrl mapping, and blocker dropping
+
+- Added `lib/url-classifier.js` to detect web pages, HTML embeds, Telegram bot redirects, and archive files (`.zip`, `.rar`).
+- `format.js` maps detected web pages/embeds to Stremio's `externalUrl` property (and omits `url`, `proxyHeaders`, and `videoSize`), preventing Stremio's native player from crashing or throwing "Playback error" on HTML pages. Direct video streams (`.m3u8`, `.mpd`, `.mp4`, `.mkv`, Cloudflare R2, Google UserContent) continue to use `url`.
+- `streams.js` drops rate-limit / anti-bot blocker links (`/slowdown` from DahmerMovies), accepts `externalUrl` in `validStream` and `dedupe`, and prioritizes direct video streams before external web page links in `collectStreams`.
+- Tests added in `scripts/test-filters.js` and `scripts/test-runtime.js` covering direct streams, web pages, embeds, `.zip` archives, and sorting precedence. All checks and linter pass.
 
 ### 2026-11-10 - Upstream sync and verification (e66d806)
 
