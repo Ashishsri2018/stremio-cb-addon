@@ -180,7 +180,7 @@ Filters are encoded in the addon URL as base64url JSON and applied per request o
 - The live service can store a user-supplied `TMDB_API_KEY` as an environment variable (never committed). It is used only by the Cinemeta fallback resolver; provider-embedded TMDB keys are unaffected.
 - CI (`.github/workflows/ci.yml`): on push/PR, runs `npm ci`, ESLint (`npm run lint`), syntax check (root + `lib/`), provider registry verification, dependency audit gate (`scripts/check-audit.js`), unit tests (`npm test`: filters + runtime), and HTTP smoke tests including `/health`, `/stats`, `/configure`, and configured routes.
 - Node is pinned to 22 via `.nvmrc` for both CI and Render.
-- Sync (`.github/workflows/sync-upstream.yml`): daily at 03:17 UTC (also manual). It vendors the latest upstream providers (including disabled ones), verifies the active provider set, and commits only when valid. The resulting commit triggers CI.
+- Sync (`.github/workflows/sync-upstream.yml`): daily at 03:17 UTC (also manual). It clones the latest upstream providers (retrying transient clone failures three times), verifies the active provider set, and commits only when valid. A failed clone or verification exits non-zero before committing, so the last good vendor snapshot stays deployed. The resulting commit triggers CI.
 - Keep-alive (`.github/workflows/keep-alive.yml`): four daily 5h50m jobs ping `/health` (via repository secret `HEALTH_CHECK_URL`) every 10 minutes so free instances do not sleep without burning unnecessary Actions minutes.
 - Docs-only commits use `[skip ci]` (plus `[skip render]`) to avoid unnecessary builds.
 - Render uses `autoDeployTrigger: checksPass`, so deploys start only after the CI checks for the commit pass.

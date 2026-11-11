@@ -25,7 +25,20 @@ jobs:
 
       - name: Vendor latest upstream providers
         run: |
-          git clone --depth 1 https://github.com/SA7ANI/cb-providers.git /tmp/upstream
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            rm -rf /tmp/upstream
+            if git clone --depth 1 https://github.com/SA7ANI/cb-providers.git /tmp/upstream; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::failed to clone upstream after 3 attempts"
+              exit 1
+            fi
+            delay=$((attempt * 2))
+            echo "clone failed; retrying in ${delay}s"
+            sleep "$delay"
+          done
           rm -rf vendor/cb-providers/providers
           mkdir -p vendor/cb-providers
           cp -R /tmp/upstream/providers vendor/cb-providers/providers

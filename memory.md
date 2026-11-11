@@ -25,6 +25,12 @@ Conventions:
 
 ## Log
 
+### 2026-11-11 - Retry upstream sync and fail before committing
+
+- `.github/workflows/sync-upstream.yml` now retries the upstream `git clone` three times with 2 s/4 s backoff and exits non-zero with an error annotation if all attempts fail.
+- The job already commits only after `npm run verify` passes; a failed clone or verification now guarantees no vendor commit is pushed, so Render keeps the last good deployment live.
+- No addon runtime changes; `npm test` and `npm run lint` pass.
+
 ### 2026-11-11 - Canonical health and stats telemetry
 
 - Added `telemetry.js` as the single canonical response builder for both `/health` and `/stats`.

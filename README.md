@@ -155,7 +155,7 @@ For more architectural details, see [architecture.md](architecture.md).
 
 ## Upstream Synchronization
 
-Upstream scrapers are vendored under `vendor/cb-providers/` and synchronized automatically by `.github/workflows/sync-upstream.yml` every day at 03:17 UTC.
+Upstream scrapers are vendored under `vendor/cb-providers/` and synchronized automatically by `.github/workflows/sync-upstream.yml` every day at 03:17 UTC. The sync retries transient clone failures three times; if it still fails, the job exits non-zero before committing, so the last verified vendor snapshot stays deployed.
 
 > [!IMPORTANT]
 > Never manually edit files in `vendor/cb-providers/`, as they are refreshed daily from upstream. Any custom addon behavior, deduplication, URL classification, or fixes must be implemented in addon code (`lib/`, `streams.js`, `format.js`).
